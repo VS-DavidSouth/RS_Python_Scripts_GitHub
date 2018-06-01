@@ -23,11 +23,19 @@
 ############################
 ####### SETUP ##############
 ############################
+import time
+start_time = time.time()
+
 import arcpy
-from arcpy import env
 arcpy.env.overwriteOutput = True
+
 import numpy as np
-import csv
+
+# this next line gives us access to two dictionaries for converting state names to abbreviations and vice versa
+from O:\AI Modeling Coop Agreement 2017\David_working\Python\Converting_state_names_and_abreviations.py import *
+
+import csv, os
+
 import time
 start_time = time.time()
 
@@ -56,53 +64,58 @@ def collectCounties():
 
     counties = np.array (counties)
 
-def createTP(state, county):
-    ()
+def createTP_FN(state, county):
+    state_name = state_abbrev_to_name[state]    # this comes from the Converting_state_names_and_abreviations.py file that we imported from back in the setup
+    Final = os.path.join(r'A:', state_name, state + '1cluster.gdb', county + 'Co_Prems_Final_Final')  # yes there are supposed to be two '_Final' segments
 
-def createFN(state, county):
-    ()
+    if arcpy.exists(Final) == False:    # change it to _Final instead
+        Final = os.path.join(r'A:', state_name, state + '1cluster.gdb', county + 'Co_Prems_Final')    # for some of the files, there is not a _Final_Final
 
-def createFP(state, county):
+    if arcpy.exists(Final) == False:    # change it to a different cluster folder
+        Final = 
+    
+    #MakeFeatureLayer_management(
+
+def addFP(state, county):
     ()
 
 ############################
 ####### DO STUFF ###########
 ############################
 
-collectCounties() # create the 'counties' numpy array
+if __name__ == '__main__':
 
-# loop for all relevant counties
-for county in counties:
-    state = county[1][0:2]    # holds the 2-letter abbreviation for the current state
-    countyName = county[2]    # holds the county name
-    if not county[0] == '':     # skip the first row which just contains the column labels
-        createTP(state, countyName)
-        print state, countyName, "county TP completed. Script duration so far:", time.time() - start_time / 60, "minutes"
+    collectCounties() # create the 'counties' numpy array
+
+    # loop for all relevant counties
+    for county in counties:
+        state = county[1][0:2]    # holds the 2-letter abbreviation for the current state
+        countyName = county[2]    # holds the county name
+        if not county[0] == '':     # skip the first row which just contains the column labels
+            createTP_FN(state, countyName)
+            print state, countyName, "county TP completed. Script duration so far:", time.time() - start_time / 60, "minutes"
+            
+            addFP(state, countyName)
+            print state, countyName, "county FP completed. Script duration so far:", time.time() - start_time / 60, "minutes"
+            
+
         
-        createFN(state, countyName)
-        print state, countyName, "county FN completed. Script duration so far:", time.time() - start_time / 60, "minutes"
 
-        createFP(state, countyName)
-        print state, countyName, "county FP completed. Script duration so far:", time.time() - start_time / 60, "minutes"
+
+    ############################
+    ####### CLEANUP ############
+    ############################
+
+    time_to_run = (time.time() - start_time) / 60.
+
+    print "---------------------\nSCRIPT COMPLETE!"
+
+    if time_to_run < 60. :
         
+        print "This program took", round(time_to_run), "minutes to run."
 
-    
-
-
-############################
-####### CLEANUP ############
-############################
-
-time_to_run = (time.time() - start_time) / 60.
-
-print "---------------------\nSCRIPT COMPLETE!"
-
-if time_to_run < 60. :
-    
-    print "This program took", round(time_to_run), "minutes to run."
-
-else:
-    print "This program took", round( (time_to_run / 60.) , 1) , "hours to run."
-    
-print "---------------------"
+    else:
+        print "This program took", round( (time_to_run / 60.) , 1) , "hours to run."
+        
+    print "---------------------"
 
