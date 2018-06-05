@@ -22,10 +22,10 @@
 ############################
 ####### SETUP ##############
 ############################
-import csv, os, sys
-
 import time
 start_time = time.time()
+
+import csv, os, sys
 
 import arcpy
 arcpy.env.overwriteOutput = True
@@ -33,7 +33,7 @@ arcpy.env.overwriteOutput = True
 import numpy as np
 
 # this next line gives us access to two dictionaries for converting state names to abbreviations and vice versa
-sys.path.insert(0, r'O:\AI Modeling Coop Agreement 2017\David_working\Python\'
+sys.path.insert(0, r'O:\AI Modeling Coop Agreement 2017\David_working\Python')
 from Converting_state_names_and_abreviations.py import *
 
 
@@ -47,6 +47,9 @@ start_time = time.time()
 
 # location of CSV with names of all completed counties
 countiesCSV = r'O:\AI Modeling Coop Agreement 2017\David_working\Remote_Sensing_Procedure\RS_completed_counties.csv'
+
+# location of CSV with summary satistics, such as Collect Events which is used to tell TP from FN
+summaryStatsCSV = r'O:\AI Modeling Coop Agreement 2017\David_working\Remote_Sensing_Procedure\Stats_summary.csv'
 
 # location of probability surface raster
 probSurface = r'N:\FLAPS from Chris Burdett\Data\poultry_prob_surface\poultryMskNrm\poultryMskNrm.tif'
@@ -69,6 +72,31 @@ def collectCounties():
             counties.append(row)
 
     counties = np.array (counties)
+
+def collectSummaryStats():
+    ##
+    ## This function is similar to the collectCounties function except
+    ##  instead it looks at the summary spreadsheet for all counties.
+    ##
+    global summaryStats
+    summaryStats = []
+
+    with open(summaryStatsCSV, 'rb') as CSVfile:
+        reader = csv.reader(CSVfile)
+        for row in reader:
+            summaryStats.append(row)
+
+    summaryStats = np.array (summaryStats)
+
+def findCollectEventsCount(state_abbrev, county)
+    ##
+    ## This function seeks through the summaryStats numpy array and returns the
+    ##  proper CollectEvents value which is used to determine the line between
+    ##  TP and FN.
+    ##
+    for row in summaryStats:
+        if (row[0][:1] == state_abbrev) and (row[1] == county):
+            return row[7]
 
 def createTP_FN(state_abbrev, county):
     ##
@@ -101,7 +129,7 @@ def createTP_FN(state_abbrev, county):
     # determine the number of points in the corresponding CollectEvents file, which will be used
     #  as the threshold of where points were manually added. If OBJECTID > # entries in CollectEvents,
     #  it was manually added and thus a False Negative.
-    CollectEvents = 
+    CollectEvents = findCollectEventsCount(state_abbrev, county)
 
     # decide whether each location is a TP or FN
     arcpy.CalculateField_management(in_table = TP_FN, field = "TP_FN_FP", \
@@ -150,6 +178,18 @@ def addFP(state_abbrev, county):
     arcpy.Delete_management(in_data = 'in_memory/temp_buffer', data_type = "")
     arcpy.Delete_management(in_data = TP_FN, data_type = "")
     arcpy.Delete_management(in_data = FP, data_type = "")
+
+    # calculate the TP_FN_FP field, change any blanks to 3 (representing FP)
+    arcpy.CalculateField_management(in_table = TP_FN_FP, field = "TP_FN_FP", \
+                                    expression = "fn( !TP_FN_FP!)", \
+                                    expression_type="PYTHON_9.3", \
+                                    code_block="def fn(x):\n  if (x is None):\n    return (3)\n  else:\n    return x")
+
+    # change the Confidence field for all FP to 9, representing 'INCORRECT'
+    arcpy.CalculateField_management(in_table = TP_FN_FP, field = "Confidence", \
+                                    expression = "fn(!Confidence!)", \
+                                    expression_type="PYTHON_9.3", \
+                                    code_block = "def fn(y):\n  if (y is None):\n    return (9)\n  else:\n    return y")
         
 
 ############################
@@ -159,6 +199,7 @@ def addFP(state_abbrev, county):
 if __name__ == '__main__':
 
     collectCounties() # create the 'counties' numpy array
+    collectSummaryStats()
 
     # loop for all relevant counties
     for county in counties:
