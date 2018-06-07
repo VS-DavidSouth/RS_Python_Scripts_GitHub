@@ -40,9 +40,6 @@ from Converting_state_names_and_abreviations import *
 ####### PARAMETERS #########
 ############################
 
-# location of CSV with names of all completed counties
-countiesCSV = r'O:\AI Modeling Coop Agreement 2017\David_working\Remote_Sensing_Procedure\RS_completed_counties.csv'
-
 # location of CSV with summary satistics, such as Collect Events which is used to tell TP from FN
 summaryStatsCSV = r'O:\AI Modeling Coop Agreement 2017\David_working\Remote_Sensing_Procedure\Stats_summary.csv'
 
@@ -67,25 +64,6 @@ def checkTime():
     else:
         return str(round( timeSoFar / 60. , 1)) + " hours"
 
-
-def collectCounties():
-    ##
-    ## This function creates a numpy array from the countiesCSV.csv file.
-    ##  This gives the names and states of all counties that need to be run.
-    ##
-    global counties
-    counties = [] # define a blank list that will later be turned into a numpy array
-    
-    with open(countiesCSV, 'rb') as CSVfile:
-        reader = csv.reader(CSVfile)
-        for row in reader:
-            
-            if not row[0] == '' and not row[1] == 'MS2':     # skip the first row which just contains the column labels, also skip MS2 because it wasn't completed
-
-                counties.append(row)
-
-    counties = np.array (counties)
-
 def collectSummaryStats():
     ##
     ## This function is similar to the collectCounties function except
@@ -94,10 +72,12 @@ def collectSummaryStats():
     global summaryStats
     summaryStats = []
 
+
     with open(summaryStatsCSV, 'rb') as CSVfile:
         reader = csv.reader(CSVfile)
         for row in reader:
-            summaryStats.append(row)
+            if not row[0] == 'State' and not row[0] == '' and not row[0] == 'MS2':     # skip the first row which just contains the column labels, also skip MS2 because it wasn't completed
+                summaryStats.append(row)
 
     summaryStats = np.array (summaryStats)
 
@@ -108,7 +88,7 @@ def findCollectEventsCount(state_abbrev, county):
     ##  TP and FN.
     ##
     for row in summaryStats:
-        if (row[0][:1] == state_abbrev) and (row[1] == county):
+        if (row[0][:2] == state_abbrev) and (row[1] == county):
             return row[7]
 
 def createTP_FN(state_abbrev, county):
@@ -136,23 +116,31 @@ def createTP_FN(state_abbrev, county):
                                   out_feature_class = TP_FN, \
                                   config_keyword="", spatial_grid_1="0", spatial_grid_2="0", spatial_grid_3="0")
 
+    # update the new file with the old OBJECTID value so that you can keep track of which are TP and FN
+    arcpy.AddField_management(in_table = TP_FN, field_name = "OID2", field_type="SHORT", field_precision="", field_scale="", field_length="", field_alias="", field_is_nullable="NULLABLE", field_is_required="NON_REQUIRED", field_domain="")
+    OID_list = []
+    with arcpy.da.SearchCursor(Final, 'OBJECTID') as cursor:
+        for row in cursor:
+            OID_list.append(row[0])
+    arcpy.CalculateField_management(in_table = TP_FN, field = "OID2", expression = 
+    
     # add a new field to store whether it is a True Positive (1), a False Negative (2) or a False Positive (3) 
     arcpy.AddField_management(in_table = TP_FN, field_name = "TP_FN_FP", field_type="SHORT", field_precision="", field_scale="", field_length="", field_alias="", field_is_nullable="NULLABLE", field_is_required="NON_REQUIRED", field_domain="")
 
     # determine the number of points in the corresponding CollectEvents file, which will be used
     #  as the threshold of where points were manually added. If OBJECTID > # entries in CollectEvents,
     #  it was manually added and thus a False Negative.
-    CollectEvents = findCollectEventsCount(state_abbrev, county)
+    collectEvents = findCollectEventsCount(state_abbrev, county)
 
     # decide whether each location is a TP or FN
     arcpy.CalculateField_management(in_table = TP_FN, field = "TP_FN_FP", \
                                     expression = "fn(!OBJECTID!)", \
                                     expression_type = "PYTHON_9.3", \
-                                    code_block = 'def fn(num):\n  if num <= %s:\n    return (1)\n  elif num > %s:\n    return (2)' %(CollectEvents, CollectEvents))
+                                    code_block = 'def fn(num):\n  if num <= %s:\n    return (1)\n  elif num > %s:\n    return (2)' %(collectEvents, collectEvents))
 
 
 def addFP(state_abbrev, county):
-    global FP, TP_FN_FP
+    global TP_FN, TP_FN_FP
     
     state_name = state_abbrev_to_name[state_abbrev]
 
@@ -163,12 +151,11 @@ def addFP(state_abbrev, county):
     county_outline = os.path.join(r'N:\Remote Sensing Projects\2016 Cooperative Agreement Poultry Barns\Documents\Deliverables\Library\CountyOutlines', \
                                   state_name + '.gdb', county + 'Co' + state_abbrev + '_outline')
 
-    # define location of FP file and the final TP_FN_FP file
+    # define location of TP_FN file and the final TP_FN_FP file
+    TP_FN = os.path.join(r'O:\AI Modeling Coop Agreement 2017\David_working\Remote_Sensing_Procedure\TP_FN_FP.gdb', state_abbrev + '_' + county + '_TP_FN')
     TP_FN_FP = os.path.join(r'O:\AI Modeling Coop Agreement 2017\David_working\Remote_Sensing_Procedure\TP_FN_FP.gdb', state_abbrev + '_' + county + '_TP_FN_FP')
 
     # delete the files if they exist
-    if arcpy.Exists(FP):
-        arcpy.Delete_management(FP)
     if arcpy.Exists(TP_FN_FP):
         arcpy.Delete_management(TP_FN_FP)
 
@@ -181,20 +168,16 @@ def addFP(state_abbrev, county):
 
     # create temprorary buffer, which will be used to cut out TP & FN from _Batch file
     arcpy.Buffer_analysis(in_features = Final, out_feature_class = 'in_memory/temp_buffer', \
-                          buffer_distance_or_field = "200 Meters", line_side="FULL", line_end_type="ROUND", \
-                          dissolve_option="NONE", dissolve_field="", method="PLANAR")
+                          buffer_distance_or_field = "200 Meters", line_side = "FULL", line_end_type = "ROUND", \
+                          dissolve_option = "NONE", dissolve_field = "", method = "PLANAR")
 
-    # clip out all points of _Batch that are within 200m of either a TP or a FN so the program can root out all FP
-    #arcpy.Clip_analysis(in_features = 'in_memory/temp_point', clip_features = 'in_memory/temp_buffer', \
-                        #out_feature_class = FP, cluster_tolerance="")
-
-    arcpy.Erase_analysis(in_features = 'in_memory\temp_point', \
-                         erase_features = Final, \
-                         out_feature_class = 'in_memory\temp_FP', \
-                         cluster_tolerance = "200 Meters")
-                      
+    arcpy.Erase_analysis(in_features = 'in_memory/temp_point', \
+                         erase_features = 'in_memory/temp_buffer', \
+                         out_feature_class = 'in_memory/temp_FP', \
+                         cluster_tolerance = "")
+                     
     # combine the TP_FN file with the FP file
-    arcpy.Merge_management(inputs = TP_FN + ';' + 'in_memory\temp_FP', output = TP_FN_FP, field_mappings='ICOUNT "ICOUNT" true true false 4 Long 0 0 ,First,#,GA_Franklin_TP_FN,ICOUNT,-1,-1;Confidence "Confidence" true true false 2 Short 0 0 ,First,#,GA_Franklin_TP_FN,Confidence,-1,-1;POINT_X "POINT_X" true true false 8 Double 0 0 ,First,#,GA_Franklin_TP_FN,POINT_X,-1,-1;POINT_Y "POINT_Y" true true false 8 Double 0 0 ,First,#,GA_Franklin_TP_FN,POINT_Y,-1,-1;TP_FN_FP "TP_FN_FP" true true false 2 Short 0 0 ,First,#,GA_Franklin_TP_FN,TP_FN_FP,-1,-1')
+    arcpy.Merge_management(inputs = TP_FN + ';' + 'in_memory/temp_FP', output = TP_FN_FP, field_mappings='ICOUNT "ICOUNT" true true false 4 Long 0 0 ,First,#,GA_Franklin_TP_FN,ICOUNT,-1,-1;Confidence "Confidence" true true false 2 Short 0 0 ,First,#,GA_Franklin_TP_FN,Confidence,-1,-1;POINT_X "POINT_X" true true false 8 Double 0 0 ,First,#,GA_Franklin_TP_FN,POINT_X,-1,-1;POINT_Y "POINT_Y" true true false 8 Double 0 0 ,First,#,GA_Franklin_TP_FN,POINT_Y,-1,-1;TP_FN_FP "TP_FN_FP" true true false 2 Short 0 0 ,First,#,GA_Franklin_TP_FN,TP_FN_FP,-1,-1')
 
     # delete all the 'in memory' temporary files and the individual TP_FN and FP files
     arcpy.Delete_management(in_data = 'in_memory/temp_clip', data_type = "")
@@ -227,39 +210,35 @@ if __name__ == '__main__':
     collectSummaryStats() # create the 'summaryStats' numpy array
 
     # loop for all relevant counties
-    for county in counties:
-        state_abbrev = county[1][0:2]    # holds the 2-letter abbreviation for the current state
+    for county in summaryStats:
+        state_abbrev = county[0][0:2]    # holds the 2-letter abbreviation for the current state
         state_name = state_abbrev_to_name[state_abbrev]     # holds the full name of the state
-        countyName = county[2]    # holds the county name
+        countyName = county[1]    # holds the county name
 
         errorFlag = []
         
         try:
-            
+        #if state_abbrev == 'GA' and countyName == 'Franklin':
             createTP_FN(state_abbrev, countyName)
             print state_name, countyName, "county TPs and FNs completed. Script duration so far:", checkTime()
 
         except:
             errorFlag += [1]
-
-        if 1 in errorFlag:
             print "ERROR with TP & FN for", state_name, countyName
-            errorCounties += [state_name, countyName, 'TP_FN']
+            errorCounties += [[state_name, countyName, 'TP_FN']]
 
         try:
-            
+        #if state_abbrev == 'GA' and countyName == 'Franklin':   
             addFP(state_abbrev, countyName)
             print state_name, countyName, "county FPs completed. Script duration so far:", checkTime()
             
         except:
             errorFlag = [2]
-
-        if 2 in errorFlag:
             print "ERROR with FP for", state_name, countyName
-            errorCounties += [state_name, countyName, 'FP']
+            errorCounties += [[state_name, countyName, 'FP']]
                 
     errorCounties = np.array(errorCounties)
-    print "Counties that had errors:/n", errorCounties
+    print "Counties that had errors:\n", errorCounties
 
     ############################
     ####### CLEANUP ############
