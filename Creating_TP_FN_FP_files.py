@@ -91,6 +91,39 @@ def findCollectEventsCount(state_abbrev, county):
         if (row[0][:2] == state_abbrev) and (row[1] == county):
             return row[7]
 
+
+def findBatchFiles():
+    ##
+    ## This function looks through the A:\ Drive to find all the files with the
+    ##  suffix '_Batch' and organizes them (with their file location) in a list.
+    ##
+    global batchList
+
+    print "Finding _Batch files..."
+    
+    folderLocation = r'A:'
+    walk = arcpy.da.Walk(folderLocation, datatype = "FeatureClass", type = "Polygon")
+
+    nopeList = ['Project Documents', 'Copy',]   # this is unused so far, if more entries are needed than this will be used to negatively select things
+    batchList = []
+
+    for dirpath, dirnames, filenames in walk:
+            for filename in filenames:
+                    filepath = os.path.join(dirpath, filename)
+                    if filename[-6:] == '_Batch' and not 'Project Documents' in filepath and not 'Copy' in filepath:
+                            batchList.append(filepath)
+    print "_Batch files found. Script duration so far:", checkTime()
+
+def batchFile(state_abbrev, county):
+    ##
+    ## This function returns the apprpriate file location for that county.
+    ##
+    for batch in batchList:
+            state_name = state_abbrev_to_name[state_abbrev]
+            state_name = state_name.replace(' ', '')
+            if state_name in batch and county in batch:
+                    return batch
+
 def createTP_FN(state_abbrev, county):
     ##
     ## This function creates a file containing all TP and FN and labels them
@@ -100,30 +133,24 @@ def createTP_FN(state_abbrev, county):
     global Final, TP_FN
 
     state_name = state_abbrev_to_name[state_abbrev]    # this comes from the Converting_state_names_and_abreviations.py file that we imported from back in the setup
+    state_name = state_name.replace(' ', '')
 
     # define the path to the input file that will be used to determine both TP and FN
     Final = os.path.join(r'N:\Remote Sensing Projects\2016 Cooperative Agreement Poultry Barns\Documents\Deliverables\Library\Poultry_Premises_Results', \
                          state_name + '.gdb', county + 'Co_Prems_FINAL')
 
-    if arcpy.Exists(Final) == False:    # check to see if the file exists, and if not add another '_FINAL' to it because some have the suffix twice
-        Final = Final + '_FINAL'
-
     # define the path to the _TP_FN output file, which will later get renamed as _TP_FN_FP
     TP_FN = os.path.join(r'O:\AI Modeling Coop Agreement 2017\David_working\Remote_Sensing_Procedure\TP_FN_FP.gdb', state_abbrev + '_' + county + '_TP_FN')
+
+    # delete the files if they exist
+    if arcpy.Exists(TP_FN):
+        arcpy.Delete_management(TP_FN)
 
     # create a copy of the input file, create it as TP_FN, defined above                      
     arcpy.CopyFeatures_management(in_features = Final, \
                                   out_feature_class = TP_FN, \
                                   config_keyword="", spatial_grid_1="0", spatial_grid_2="0", spatial_grid_3="0")
 
-    # update the new file with the old OBJECTID value so that you can keep track of which are TP and FN
-    arcpy.AddField_management(in_table = TP_FN, field_name = "OID2", field_type="SHORT", field_precision="", field_scale="", field_length="", field_alias="", field_is_nullable="NULLABLE", field_is_required="NON_REQUIRED", field_domain="")
-    OID_list = []
-    with arcpy.da.SearchCursor(Final, 'OBJECTID') as cursor:
-        for row in cursor:
-            OID_list.append(row[0])
-    arcpy.CalculateField_management(in_table = TP_FN, field = "OID2", expression = 
-    
     # add a new field to store whether it is a True Positive (1), a False Negative (2) or a False Positive (3) 
     arcpy.AddField_management(in_table = TP_FN, field_name = "TP_FN_FP", field_type="SHORT", field_precision="", field_scale="", field_length="", field_alias="", field_is_nullable="NULLABLE", field_is_required="NON_REQUIRED", field_domain="")
 
@@ -136,16 +163,21 @@ def createTP_FN(state_abbrev, county):
     arcpy.CalculateField_management(in_table = TP_FN, field = "TP_FN_FP", \
                                     expression = "fn(!OBJECTID!)", \
                                     expression_type = "PYTHON_9.3", \
-                                    code_block = 'def fn(num):\n  if num <= %s:\n    return (1)\n  elif num > %s:\n    return (2)' %(collectEvents, collectEvents))
-
+                                    ##code_block = 'def fn(num):\n  if num <= %s:\n    return (1)\n  elif num > %s:\n    return (2)' %(collectEvents, collectEvents))
+                                    code_block = 'def fn(num):\n  return (1)')   # if the issue with the OBJECTID field gets resolved, uncomment the above line and delete this line
+                                            ## As of now, this section is pretty pointless. Since efforts so far to copy the OBJECTID field from the original '_FINAL' files resulted
+                                            ##  in the original OBJECTID field to overwrite itself, it has made it impossible to judge the line between TP and FN. Originally FN
+                                            ##  were determined as the points that have an OBJECTID field value higher than the _CollectEvents point count, meaning they were
+                                            ##  added manually. Since the OBJECTID field has been overwritten, this is moot. It may be possible to go back to the previous files later on.
 
 def addFP(state_abbrev, county):
     global TP_FN, TP_FN_FP
     
     state_name = state_abbrev_to_name[state_abbrev]
+    state_name = state_name.replace(' ', '')
 
     # define the _batch file to be clipped
-    batch = os.path.join('A:\\', state_name, state_abbrev + '1cluster.gdb', county + 'Co_Batch')
+    batch = batchFile(state_abbrev, county)
 
     # define the location of the county file to clip the batch to
     county_outline = os.path.join(r'N:\Remote Sensing Projects\2016 Cooperative Agreement Poultry Barns\Documents\Deliverables\Library\CountyOutlines', \
@@ -204,10 +236,12 @@ def addFP(state_abbrev, county):
 
 if __name__ == '__main__':
 
-    errorCounties = []
+    print "Script started! This will probably take 15-25 minutes.\n\n"
 
-    collectCounties() # create the 'counties' numpy array
+    errorCounties = [] # this will be filled with the counties that have had errors so far
+
     collectSummaryStats() # create the 'summaryStats' numpy array
+    findBatchFiles()    # create a list of the file locations of all the _Batch files on the A: drive
 
     # loop for all relevant counties
     for county in summaryStats:
