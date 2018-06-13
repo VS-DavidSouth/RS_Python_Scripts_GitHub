@@ -80,6 +80,7 @@ def collectSummaryStats():
                 summaryStats.append(row)
 
     summaryStats = np.array (summaryStats)
+    return summaryStats
 
 def findCollectEventsCount(state_abbrev, county):
     ##
@@ -92,39 +93,83 @@ def findCollectEventsCount(state_abbrev, county):
             return row[7]
 
 
+def specificCountyFile(file_list, state_abbrev, county_name):
+    ##
+    ## This fuction searches through a list of filepaths and finds the one for the
+    ##  appropriate state. This can be used for batchList, filteredFinalFilesList,
+    ##  etc.
+    ##
+            
+            
+    for file_path in file_list:
+        state_name = state_abbrev_to_name[state_abbrev]
+        state_name = state_name.replace(' ', '')
+        
+        if state_abbrev in file_path or state_name in file_path:
+            if county_name in file_path:
+                return file_path    # it should be noted that this will only choose the first matching file and ignore any further ones. This could introduce errors.
+
 def findBatchFiles():
     ##
     ## This function looks through the A:\ Drive to find all the files with the
     ##  suffix '_Batch' and organizes them (with their file location) in a list.
     ##
     global batchList
-
-    print "Finding _Batch files..."
     
     folderLocation = r'A:'
     walk = arcpy.da.Walk(folderLocation, datatype = "FeatureClass", type = "Polygon")
 
     nopeList = ['Project Documents', 'Copy',]   # this is unused so far, if more entries are needed than this will be used to negatively select things
+    yepList = ['GilesCo_Results', 'FranklinCo_Results', 'WayneCo_Results2', \
+               'SampsonCo_Results2', 'DuplinCo_Results2',]
     batchList = []
 
     for dirpath, dirnames, filenames in walk:
-            for filename in filenames:
-                    filepath = os.path.join(dirpath, filename)
-                    if filename[-6:] == '_Batch' and not 'Project Documents' in filepath and not 'Copy' in filepath:
-                            batchList.append(filepath)
-    print "_Batch files found. Script duration so far:", checkTime()
+        for filename in filenames:
+            filepath = os.path.join(dirpath, filename)
+            if not 'Project Documents' in filepath and not 'Copy' in filepath:
+                if filename[-6:] == '_Batch':
+                    batchList.append(filepath)
+                elif 'tr_Lrn_Rmv_RS_CVM' in filename:
+                    batchList.append(filepath)
+                elif filename in yepList:
+                    batchList.append(filepath)
+    
+    return batchList
 
-def batchFile(state_abbrev, county):
+def findFinalFiles():
     ##
-    ## This function returns the apprpriate file location for that county.
+    ## This function 'walks' through all files in the A: drive collects the locations
+    ##  of all _FINAL files.
     ##
-    for batch in batchList:
-            state_name = state_abbrev_to_name[state_abbrev]
-            state_name = state_name.replace(' ', '')
-            if state_name in batch and county in batch:
-                    return batch
+    global filteredFinalFilesList
+    
+    folderLocation = r'A:'
+    walk = arcpy.da.Walk(folderLocation, datatype = "FeatureClass", type = "Point")
 
-def createTP_FN(state_abbrev, county):
+    finalFilesList = []
+    filteredFinalFilesList = []
+
+    for dirpath, dirnames, filenames in walk:
+        for filename in filenames:
+            filepath = os.path.join(dirpath, filename)
+            if '_Prem' in filepath:     # this is not '_Prems' because I think at least one filename doesn't have the 's'
+                if '_FINAL' in filename or '_FINAL_FINAL' in filename \
+                or '_Final' in filename:
+                    finalFilesList.append(filepath)
+
+    for county in summaryStats:
+        state_abbrev = county[0][0:2]    # holds the 2-letter abbreviation for the current state
+        state_name = state_abbrev_to_name[state_abbrev]     # holds the full name of the state
+        state_name = state_name.replace(' ', '')
+        county_name = county[1]    # holds the county name
+
+        filteredFinalFilesList.append( \
+            specificCountyFile(finalFilesList, state_abbrev, county_name) )
+            
+    return filteredFinalFilesList
+
+def createTP_FN(state_abbrev, county_name):
     ##
     ## This function creates a file containing all TP and FN and labels them
     ##  with a 1 for TP and 2 for FN. This file will be turned into TP_FN_FP
@@ -136,11 +181,11 @@ def createTP_FN(state_abbrev, county):
     state_name = state_name.replace(' ', '')
 
     # define the path to the input file that will be used to determine both TP and FN
-    Final = os.path.join(r'N:\Remote Sensing Projects\2016 Cooperative Agreement Poultry Barns\Documents\Deliverables\Library\Poultry_Premises_Results', \
-                         state_name + '.gdb', county + 'Co_Prems_FINAL')
+    Final = specificCountyFile(filteredFilesList, state_abbrev, county_name)
 
     # define the path to the _TP_FN output file, which will later get renamed as _TP_FN_FP
-    TP_FN = os.path.join(r'O:\AI Modeling Coop Agreement 2017\David_working\Remote_Sensing_Procedure\TP_FN_FP.gdb', state_abbrev + '_' + county + '_TP_FN')
+    TP_FN = os.path.join(r'O:\AI Modeling Coop Agreement 2017\David_working\Remote_Sensing_Procedure\TP_FN_FP.gdb', \
+                         state_abbrev + '_' + county_name + '_TP_FN')
 
     # delete the files if they exist
     if arcpy.Exists(TP_FN):
@@ -157,7 +202,7 @@ def createTP_FN(state_abbrev, county):
     # determine the number of points in the corresponding CollectEvents file, which will be used
     #  as the threshold of where points were manually added. If OBJECTID > # entries in CollectEvents,
     #  it was manually added and thus a False Negative.
-    collectEvents = findCollectEventsCount(state_abbrev, county)
+    collectEvents = findCollectEventsCount(state_abbrev, county_name)
 
     # decide whether each location is a TP or FN
     arcpy.CalculateField_management(in_table = TP_FN, field = "TP_FN_FP", \
@@ -170,14 +215,19 @@ def createTP_FN(state_abbrev, county):
                                             ##  were determined as the points that have an OBJECTID field value higher than the _CollectEvents point count, meaning they were
                                             ##  added manually. Since the OBJECTID field has been overwritten, this is moot. It may be possible to go back to the previous files later on.
 
-def addFP(state_abbrev, county):
+def addFP(state_abbrev, county_name):
+    ##
+    ## This function takes the existing TP_FN file and adds the FP based on the polygon
+    ##  _Batch files. It creates (or overwrites) a new TP_FN_FP file for the specific
+    ##  county. It also calcualtes the TP_FN_FP field for the new points with 3s.
+    ##
     global TP_FN, TP_FN_FP
     
     state_name = state_abbrev_to_name[state_abbrev]
     state_name = state_name.replace(' ', '')
 
     # define the _batch file to be clipped
-    batch = batchFile(state_abbrev, county)
+    batch = specificCountyFile(batchList, state_abbrev, county)
 
     # define the location of the county file to clip the batch to
     county_outline = os.path.join(r'N:\Remote Sensing Projects\2016 Cooperative Agreement Poultry Barns\Documents\Deliverables\Library\CountyOutlines', \
@@ -236,40 +286,48 @@ def addFP(state_abbrev, county):
 
 if __name__ == '__main__':
 
-    print "Script started! This will probably take 15-25 minutes.\n\n"
+    print "Script started! This will probably take 20-30 minutes.\n\n"
 
     errorCounties = [] # this will be filled with the counties that have had errors so far
 
-    collectSummaryStats() # create the 'summaryStats' numpy array
-    findBatchFiles()    # create a list of the file locations of all the _Batch files on the A: drive
+    summaryStats = collectSummaryStats() # create the 'summaryStats' numpy array
 
+    print "Finding _FINAL files..."
+    filteredFinalFilesList = findFinalFiles()   # create a list of the file locaitons of all the _FINAL files (and similar) on the A: drive
+    print "_FINAL files found. Script duration so far:", checkTime()
+
+    print "Finding _Batch files..."
+    batchList = findBatchFiles()    # create a list of the file locations of all the _Batch files on the A: drive
+    print "_Batch files found. Script duration so far:", checkTime()
+    
     # loop for all relevant counties
     for county in summaryStats:
         state_abbrev = county[0][0:2]    # holds the 2-letter abbreviation for the current state
         state_name = state_abbrev_to_name[state_abbrev]     # holds the full name of the state
-        countyName = county[1]    # holds the county name
+        state_name = state_name.replace(" ", "")
+        county_name = county[1]    # holds the county name
 
         errorFlag = []
         
         try:
-        #if state_abbrev == 'GA' and countyName == 'Franklin':
-            createTP_FN(state_abbrev, countyName)
-            print state_name, countyName, "county TPs and FNs completed. Script duration so far:", checkTime()
+        #if state_abbrev == 'GA' and county_name == 'Franklin':
+            createTP_FN(state_abbrev, county_name)
+            print state_name, county_name, "county TPs and FNs completed. Script duration so far:", checkTime()
 
         except:
             errorFlag += [1]
-            print "ERROR with TP & FN for", state_name, countyName
-            errorCounties += [[state_name, countyName, 'TP_FN']]
+            print "ERROR with TP & FN for", state_name, county_name
+            errorCounties += [[state_name, county_name, 'TP_FN']]
 
         try:
-        #if state_abbrev == 'GA' and countyName == 'Franklin':   
-            addFP(state_abbrev, countyName)
-            print state_name, countyName, "county FPs completed. Script duration so far:", checkTime()
+        #if state_abbrev == 'GA' and county_name == 'Franklin':   
+            addFP(state_abbrev, county_name)
+            print state_name, county_name, "county FPs completed. Script duration so far:", checkTime()
             
         except:
             errorFlag = [2]
-            print "ERROR with FP for", state_name, countyName
-            errorCounties += [[state_name, countyName, 'FP']]
+            print "ERROR with FP for", state_name, county_name
+            errorCounties += [[state_name, county_name, 'FP']]
                 
     errorCounties = np.array(errorCounties)
     print "Counties that had errors:\n", errorCounties
