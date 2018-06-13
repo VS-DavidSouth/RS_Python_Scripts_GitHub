@@ -96,7 +96,7 @@ def findCollectEventsCount(state_abbrev, county):
 def specificCountyFile(file_list, state_abbrev, county_name):
     ##
     ## This fuction searches through a list of filepaths and finds the one for the
-    ##  appropriate state. This can be used for batchList, filteredFinalFilesList,
+    ##  appropriate state. This can be used for batchList, correctFiles,
     ##  etc.
     ##
             
@@ -142,32 +142,37 @@ def findFinalFiles():
     ## This function 'walks' through all files in the A: drive collects the locations
     ##  of all _FINAL files.
     ##
-    global filteredFinalFilesList
+    global correctFiles
     
-    folderLocation = r'A:'
+    folderLocation = r'A:'  # this is the folder that this function will search through
+    summaryStats = collectSummaryStats()    # create the summaryStats numpy array that contains important information on the counties
     walk = arcpy.da.Walk(folderLocation, datatype = "FeatureClass", type = "Point")
+        ## This walk function systematically goes through all sub-folders/directories
+        ##  within the 'folderLocation' folder. It finds things of a certain type.
 
-    finalFilesList = []
-    filteredFinalFilesList = []
 
-    for dirpath, dirnames, filenames in walk:
+    filesList = []     # this will hold all files from A: with 'FINAL' in the name
+    correctFiles = [] # this will hold all files from filesList that don't
+                                #  have anything from the nopeList in it.
+
+    nopeList = ['Project Documents', 'Confidence3', 'Copy', 'Test', 'test', 'SpatialJ']
+        ## If any file has one or more of the items in this list within it, it will not
+        ##  be selected and will be ignored.
+
+    for dirpath, dirnames, filenames in walk:   # itterate through all directories in folderLocation
         for filename in filenames:
             filepath = os.path.join(dirpath, filename)
-            if '_Prem' in filepath:     # this is not '_Prems' because I think at least one filename doesn't have the 's'
-                if '_FINAL' in filename or '_FINAL_FINAL' in filename \
-                or '_Final' in filename:
-                    finalFilesList.append(filepath)
+            if '_Prem' in filepath:     # this is not '_Prems' because at least one filename doesn't have the 's'
+                if '_FINAL_FINAL' in filename or '_Final_FINAL' in filename:
+                    filesList.append(filepath) # find _FINAL_FINAL files first
+                elif '_FINAL2' in filename:
+                    filesList.append(filepath) # next check for a 2 at the end
+                elif '_FINAL' in filename or '_Final' in filename:
+                    filesList.append(filepath) # now look for just a single 'final'
 
-    for county in summaryStats:
-        state_abbrev = county[0][0:2]    # holds the 2-letter abbreviation for the current state
-        state_name = state_abbrev_to_name[state_abbrev]     # holds the full name of the state
-        state_name = state_name.replace(' ', '')
-        county_name = county[1]    # holds the county name
-
-        filteredFinalFilesList.append( \
-            specificCountyFile(finalFilesList, state_abbrev, county_name) )
+    correctFiles = [s for s in filesList if not any(xs in s for xs in nopeList)]
             
-    return filteredFinalFilesList
+    return correctFiles
 
 def createTP_FN(state_abbrev, county_name):
     ##
@@ -293,7 +298,7 @@ if __name__ == '__main__':
     summaryStats = collectSummaryStats() # create the 'summaryStats' numpy array
 
     print "Finding _FINAL files..."
-    filteredFinalFilesList = findFinalFiles()   # create a list of the file locaitons of all the _FINAL files (and similar) on the A: drive
+    correctFiles = findFinalFiles()   # create a list of the file locaitons of all the _FINAL files (and similar) on the A: drive
     print "_FINAL files found. Script duration so far:", checkTime()
 
     print "Finding _Batch files..."
