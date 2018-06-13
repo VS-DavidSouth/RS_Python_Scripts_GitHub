@@ -82,32 +82,47 @@ def collectSummaryStats():
     summaryStats = np.array (summaryStats)
     return summaryStats
 
-def findCollectEventsCount(state_abbrev, county):
+def findCollectEventsCount(state_abbrev, county_name):
     ##
     ## This function seeks through the summaryStats numpy array and returns the
     ##  proper CollectEvents value which is used to determine the line between
     ##  TP and FN.
     ##
     for row in summaryStats:
-        if (row[0][:2] == state_abbrev) and (row[1] == county):
+        if (row[0][:2] == state_abbrev) and (row[1] == county_name):
             return row[7]
 
 
-def specificCountyFile(file_list, state_abbrev, county_name):
+def specificCountyFile(file_list, state_abbrev, county_name, final):
     ##
     ## This fuction searches through a list of filepaths and finds the one for the
     ##  appropriate state. This can be used for batchList, correctFiles,
     ##  etc.
+    ##          file_list:  the list of filepaths that this function will sort through
+    ##          state_abbrev & county_name: state abbreviation and county name
+    ##          final:      boolean (True or False) signifying whether or not
+    ##                       the function is searching for '_FINAL' files
     ##
             
-            
+    yepList = ['_FINAL_FINAL', '_Final_FINAL', '_FINAL2', '_FINAL', '_Final']
+        
     for file_path in file_list:
         state_name = state_abbrev_to_name[state_abbrev]
         state_name = state_name.replace(' ', '')
-        
-        if state_abbrev in file_path or state_name in file_path:
-            if county_name in file_path:
-                return file_path    # it should be noted that this will only choose the first matching file and ignore any further ones. This could introduce errors.
+
+        if final == True:
+            
+            if state_abbrev in file_path or state_name in file_path:
+                if county_name in file_path:
+                    for yep in yepList:
+                        if yep in file_path:
+                            return file_path
+
+        if final == False:
+            
+            if state_abbrev in file_path or state_name in file_path:
+                if county_name in file_path:
+                    return file_path
 
 def findBatchFiles():
     ##
@@ -152,8 +167,9 @@ def findFinalFiles():
 
 
     filesList = []     # this will hold all files from A: with 'FINAL' in the name
-    correctFiles = [] # this will hold all files from filesList that don't
-                                #  have anything from the nopeList in it.
+    filteredFilesList = []    # this will hold the filtered filesList, not containing anything in nopeList
+    correctFiles = []     # this will hold all files from filesList that don't
+                          #  have anything from the nopeList in it.
 
     nopeList = ['Project Documents', 'Confidence3', 'Copy', 'Test', 'test', 'SpatialJ']
         ## If any file has one or more of the items in this list within it, it will not
@@ -162,17 +178,12 @@ def findFinalFiles():
     for dirpath, dirnames, filenames in walk:   # itterate through all directories in folderLocation
         for filename in filenames:
             filepath = os.path.join(dirpath, filename)
-            if '_Prem' in filepath:     # this is not '_Prems' because at least one filename doesn't have the 's'
-                if '_FINAL_FINAL' in filename or '_Final_FINAL' in filename:
-                    filesList.append(filepath) # find _FINAL_FINAL files first
-                elif '_FINAL2' in filename:
-                    filesList.append(filepath) # next check for a 2 at the end
-                elif '_FINAL' in filename or '_Final' in filename:
-                    filesList.append(filepath) # now look for just a single 'final'
+            if '_Prem' in filename:     # this is not '_Prems' because at least one filename doesn't have the 's'
+                filesList.append(filepath)
 
-    correctFiles = [s for s in filesList if not any(xs in s for xs in nopeList)]
-            
-    return correctFiles
+    filteredFilesList = [s for s in filesList if not any(xs in s for xs in nopeList)]
+
+    return filteredFilesList
 
 def createTP_FN(state_abbrev, county_name):
     ##
@@ -186,7 +197,7 @@ def createTP_FN(state_abbrev, county_name):
     state_name = state_name.replace(' ', '')
 
     # define the path to the input file that will be used to determine both TP and FN
-    Final = specificCountyFile(filteredFilesList, state_abbrev, county_name)
+    Final = specificCountyFile(filteredFilesList, state_abbrev, county_name, True)
 
     # define the path to the _TP_FN output file, which will later get renamed as _TP_FN_FP
     TP_FN = os.path.join(r'O:\AI Modeling Coop Agreement 2017\David_working\Remote_Sensing_Procedure\TP_FN_FP.gdb', \
@@ -213,13 +224,8 @@ def createTP_FN(state_abbrev, county_name):
     arcpy.CalculateField_management(in_table = TP_FN, field = "TP_FN_FP", \
                                     expression = "fn(!OBJECTID!)", \
                                     expression_type = "PYTHON_9.3", \
-                                    ##code_block = 'def fn(num):\n  if num <= %s:\n    return (1)\n  elif num > %s:\n    return (2)' %(collectEvents, collectEvents))
-                                    code_block = 'def fn(num):\n  return (1)')   # if the issue with the OBJECTID field gets resolved, uncomment the above line and delete this line
-                                            ## As of now, this section is pretty pointless. Since efforts so far to copy the OBJECTID field from the original '_FINAL' files resulted
-                                            ##  in the original OBJECTID field to overwrite itself, it has made it impossible to judge the line between TP and FN. Originally FN
-                                            ##  were determined as the points that have an OBJECTID field value higher than the _CollectEvents point count, meaning they were
-                                            ##  added manually. Since the OBJECTID field has been overwritten, this is moot. It may be possible to go back to the previous files later on.
-
+                                    code_block = 'def fn(num):\n  if num <= %s:\n    return (1)\n  elif num > %s:\n    return (2)' %(collectEvents, collectEvents))
+                                    
 def addFP(state_abbrev, county_name):
     ##
     ## This function takes the existing TP_FN file and adds the FP based on the polygon
@@ -232,15 +238,15 @@ def addFP(state_abbrev, county_name):
     state_name = state_name.replace(' ', '')
 
     # define the _batch file to be clipped
-    batch = specificCountyFile(batchList, state_abbrev, county)
+    batch = specificCountyFile(batchList, state_abbrev, county_name, False)
 
     # define the location of the county file to clip the batch to
     county_outline = os.path.join(r'N:\Remote Sensing Projects\2016 Cooperative Agreement Poultry Barns\Documents\Deliverables\Library\CountyOutlines', \
-                                  state_name + '.gdb', county + 'Co' + state_abbrev + '_outline')
+                                  state_name + '.gdb', county_name + 'Co' + state_abbrev + '_outline')
 
     # define location of TP_FN file and the final TP_FN_FP file
-    TP_FN = os.path.join(r'O:\AI Modeling Coop Agreement 2017\David_working\Remote_Sensing_Procedure\TP_FN_FP.gdb', state_abbrev + '_' + county + '_TP_FN')
-    TP_FN_FP = os.path.join(r'O:\AI Modeling Coop Agreement 2017\David_working\Remote_Sensing_Procedure\TP_FN_FP.gdb', state_abbrev + '_' + county + '_TP_FN_FP')
+    TP_FN = os.path.join(r'O:\AI Modeling Coop Agreement 2017\David_working\Remote_Sensing_Procedure\TP_FN_FP.gdb', state_abbrev + '_' + county_name + '_TP_FN')
+    TP_FN_FP = os.path.join(r'O:\AI Modeling Coop Agreement 2017\David_working\Remote_Sensing_Procedure\TP_FN_FP.gdb', state_abbrev + '_' + county_name + '_TP_FN_FP')
 
     # delete the files if they exist
     if arcpy.Exists(TP_FN_FP):
@@ -298,7 +304,7 @@ if __name__ == '__main__':
     summaryStats = collectSummaryStats() # create the 'summaryStats' numpy array
 
     print "Finding _FINAL files..."
-    correctFiles = findFinalFiles()   # create a list of the file locaitons of all the _FINAL files (and similar) on the A: drive
+    FINAL_Files = findFinalFiles()   # create a list of the file locaitons of all the _FINAL files (and similar) on the A: drive
     print "_FINAL files found. Script duration so far:", checkTime()
 
     print "Finding _Batch files..."

@@ -32,3 +32,4 @@ def TEST():
             errorList.append([state_name, county_name])
 
     print np.array(errorList)
+

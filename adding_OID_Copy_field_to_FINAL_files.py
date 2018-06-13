@@ -19,6 +19,8 @@ def findField(fc, fn):  #fn is short for Field Name
 #folderLocation = r'N:\Remote Sensing Projects\2016 Cooperative Agreement Poultry Barns\Documents\Deliverables\Library\Poultry_Premises_Results'
 #folderLocation = r'O:\AI Modeling Coop Agreement 2017\David_working\TEST.gdb'
 
+yepList = ['_FINAL_FINAL', '_Final_FINAL', '_FINAL2', '_FINAL', '_Final']
+
 finalFiles = findFinalFiles()
 
 #walk = arcpy.da.Walk(folderLocation, datatype = "FeatureClass", type = "Point")
@@ -29,8 +31,8 @@ finalFiles = findFinalFiles()
 
 for filepath in finalFiles:
         if findField(filepath, "OID_Copy") == False:
-            
-            arcpy.AddField_management(in_table = filepath, field_name = "OID_Copy", field_type = "SHORT", field_precision = "", field_scale = "", field_length = "", field_alias = "", field_is_nullable = "NULLABLE", field_is_required = "NON_REQUIRED", field_domain = "")
-            arcpy.CalculateField_management(in_table = filepath, field = "OID_Copy", expression = "!OBJECTID!", expression_type = "PYTHON", code_block = "")                                            
+            if any ([yep in filepath for yep in yepList]):
+                arcpy.AddField_management(in_table = filepath, field_name = "OID_Copy", field_type = "SHORT", field_precision = "", field_scale = "", field_length = "", field_alias = "", field_is_nullable = "NULLABLE", field_is_required = "NON_REQUIRED", field_domain = "")
+                arcpy.CalculateField_management(in_table = filepath, field = "OID_Copy", expression = "!OBJECTID!", expression_type = "PYTHON", code_block = "")                                            
 
-            print filepath, "completed."
+                print filepath, "completed."
