@@ -51,6 +51,9 @@ summaryStatsCSV = r'O:\AI Modeling Coop Agreement 2017\David_working\Remote_Sens
 # location of probability surface raster
 probSurface = r'N:\FLAPS from Chris Burdett\Data\poultry_prob_surface\poultryMskNrm\poultryMskNrm.tif'
 
+# folder that will hold all the output files
+outputFolder = r'O:\AI Modeling Coop Agreement 2017\David_working\Remote_Sensing_Procedure\TP_FN_FP.gdb'
+
 ############################
 ###### DEFINE FUNCTIONS ####
 ############################
@@ -97,11 +100,19 @@ def findCollectEventsCount(state_abbrev, county_name):
         if (row[0][:2] == state_abbrev) and (row[1] == county_name):
             return row[7]
 
-
+def findRowCount(state_abbrev, county_name):
+    ##
+    ## This function seeks through the summaryStats numpy array and returns the
+    ##  proper Fa_ManRev value, meaning the number of rows in that _FINAL file.
+    ##
+    for row in summaryStats:
+        if (row[0][:2] == state_abbrev) and (row[1] == county_name):
+            return row[8]
+    
 def specificCountyFile(file_list, state_abbrev, county_name, final):
     ##
     ## This fuction searches through a list of filepaths and finds the one for the
-    ##  appropriate state. This can be used for batchList, correctFiles, etc.
+    ##  appropriate state. This can be used for batchList, filteredFilesList, etc.
     ##
     ##          file_list:  the list of filepaths that this function will sort through
     ##          state_abbrev & county_name: state abbreviation and county name
@@ -110,25 +121,30 @@ def specificCountyFile(file_list, state_abbrev, county_name, final):
     ##
             
     yepList = ['_FINAL_FINAL', '_Final_FINAL', '_FINAL2', '_FINAL', '_Final']
-        
-    for file_path in file_list:
-        state_name = state_abbrev_to_name[state_abbrev]
-        state_name = state_name.replace(' ', '')
+    state_name = state_abbrev_to_name[state_abbrev]
+    state_name = state_name.replace(' ', '')
 
-        if final == True:
+
+    if final == True:
+        row_count = summaryStats[8]
+        for yep in yepList:    
+            for file_path in file_list:
+                if yep in file_path and state_name in file_path and county_name in file_path:
+                    return file_path
+                        ## This loop goes through yepList and checks to see
+                        ##  if each file_path has a version of _FINAL as
+                        ##  well as the correct state name and county name.
+                        ##  It chooses based on the order of yepList, and
+                        ##  thus chooses _FINAL_FINAL prerentially to the rest.
+                        ##  It returns the chosen file_path from the list.
             
-            if state_abbrev in file_path or state_name in file_path:
-                if county_name in file_path:    ## This loop returns the file_path
-                    for yep in yepList:         ##  if the path or name contains
-                        if yep in file_path:    ##  one of the versions of _FINAL
-                            return file_path    ##  in yepList if it matches the
-                                                ##  state and county
-        if final == False:
+    if final == False:
+        for file_path in file_list:    
+            if state_name in file_path and county_name in file_path:  
+                return file_path              
+                        ## This loop only checks for the proper state and
+                        ## county names before returning the first one.
             
-            if state_abbrev in file_path or state_name in file_path:
-                if county_name in file_path:    ## This loop just returns the
-                    return filter               ##  file_path if it matches the
-                                                ##  state and county
 def findBatchFiles():
     ##
     ## This function looks through the A:\ Drive to find all the files with the
@@ -139,10 +155,14 @@ def findBatchFiles():
     folderLocation = r'A:'
     walk = arcpy.da.Walk(folderLocation, datatype = "FeatureClass", type = "Polygon")
 
-    nopeList = ['Project Documents', 'Copy',]   # this is unused so far, if more entries are needed than this will be used to negatively select things
+    nopeList = ['Project Documents', 'Copy',]   # this is unused so far, if more entries are
+                                                #  needed, this will be used to negatively select things
+
     yepList = ['GilesCo_Results', 'FranklinCo_Results', 'WayneCo_Results2', \
-               'SampsonCo_Results2', 'DuplinCo_Results2',]
-                ## This is a list of things that didn't fit in with the naming conventions
+               'SampsonCo_Results2', 'DuplinCo_Results2', 'UnionCo_barns_tr4_Lrn_Rmv_RS', \
+               'YellCo_barns_tr_Lrn_Rmv_RS3', 'LincolnCo_barns_tr2_Lrn_Rmv_RS_CVM', \
+               'CullmanCo_barns_tr_Lrn2_Rmv_RS', 'WayneCo_barns_Lrn_Rmv_RS_CVM',
+               ]## This is a list of things that didn't fit in with the naming conventions
                 ##  of the rest of the results. These were manually collected and will be
                 ##  included in batchList. Some files had 'tr_Lrn_Rmv_RS_CVM', which was
                 ##  also added.
@@ -207,8 +227,7 @@ def createTP_FN(state_abbrev, county_name):
     Final = specificCountyFile(filteredFilesList, state_abbrev, county_name, True)
 
     # define the path to the _TP_FN output file, which will later get renamed as _TP_FN_FP
-    TP_FN = os.path.join(r'O:\AI Modeling Coop Agreement 2017\David_working\Remote_Sensing_Procedure\TP_FN_FP.gdb', \
-                         state_abbrev + '_' + county_name + '_TP_FN')
+    TP_FN = os.path.join(outputFolder, state_abbrev + '_' + county_name + '_TP_FN')
 
     collectEvents = findCollectEventsCount(state_abbrev, county_name)
         ## determine the number of points in the corresponding CollectEvents file, which will be used
@@ -253,8 +272,8 @@ def addFP(state_abbrev, county_name):
                                   state_name_county_outline + '.gdb', county_name + 'Co' + state_abbrev + '_outline')
 
     # define location of TP_FN file and the final TP_FN_FP file
-    TP_FN = os.path.join(r'O:\AI Modeling Coop Agreement 2017\David_working\Remote_Sensing_Procedure\TP_FN_FP.gdb', state_abbrev + '_' + county_name + '_TP_FN')
-    TP_FN_FP = os.path.join(r'O:\AI Modeling Coop Agreement 2017\David_working\Remote_Sensing_Procedure\TP_FN_FP.gdb', state_abbrev + '_' + county_name + '_TP_FN_FP')
+    TP_FN = os.path.join(outputFolder, state_abbrev + '_' + county_name + '_TP_FN')
+    TP_FN_FP = os.path.join(outputFolder, state_abbrev + '_' + county_name + '_TP_FN_FP')
 
     # delete the files if they exist
     if arcpy.Exists(TP_FN_FP):
@@ -299,14 +318,28 @@ def addFP(state_abbrev, county_name):
                                     expression_type = "PYTHON_9.3", \
                                     code_block = "def fn(y):\n  if (y is None):\n    return (9)\n  else:\n    return y")
         
-
+def addRasterInfo(inputPointData, rasterDataset):
+    ##
+    ## This function extracts the values from the input raster
+    ##  raster and creates two new fields in the TP_FN_FP file,
+    ##  called ProbSurf_1 and ProbSurf_2 respectively. 
+    ##  ProbSurf_1 has no interpolation, ProbSurf_2 has
+    ##  bilinear interpolation.
+    ##
+    arcpy.CheckOutExtension("Spatial")  # this just allows the script to access the Spatial Analyst ArcGIS extension
+    
+    arcpy.sa.ExtractMultiValuesToPoints (inputPointData, [[rasterDataset, 'ProbSurf_1']], "NONE")
+    arcpy.sa.ExtractMultiValuesToPoints (inputPointData, [[rasterDataset, 'ProbSurf_2']], "BILINEAR")
+    
+    arcpy.CheckInExtension("Spatial")   # this makes sure that a license does not remain in use for the Spatial Analyst extension
+    
 ############################
 ####### DO STUFF ###########
 ############################
 
 if __name__ == '__main__':
 
-    print "Script started! This will probably take 20-30 minutes.\n\n"
+    print "Script started! This will probably take 20 minutes to an hour to complete.\n\n"
 
     errorCounties = [] # this will be filled with the counties that have had errors so far
 
@@ -330,27 +363,33 @@ if __name__ == '__main__':
         errorFlag = []
         
         try:
-        #if state_abbrev == 'GA' and county_name == 'Franklin':
             createTP_FN(state_abbrev, county_name)
             print state_name, county_name, "county TPs and FNs completed. Script duration so far:", checkTime()
 
         except:
             errorFlag += [1]
             print "ERROR with TP & FN for", state_name, county_name
-            errorCounties += [[state_name, county_name, 'TP_FN']]
+            errorCounties += [[state_name, county_name, 'createTP_FN']]
 
-        try:
-        #if state_abbrev == 'GA' and county_name == 'Franklin':   
+        try:  
             addFP(state_abbrev, county_name)
             print state_name, county_name, "county FPs completed. Script duration so far:", checkTime()
             
         except:
-            errorFlag = [2]
+            errorFlag += [2]
             print "ERROR with FP for", state_name, county_name
-            errorCounties += [[state_name, county_name, 'FP']]
+            errorCounties += [[state_name, county_name, 'addFP']]
+
+        try:
+            addRasterInfo( os.path.join(outputFolder, state_abbrev + '_' + county_name + '_TP_FN_FP'), \
+                           probSurface )            
+        except:
+            errorFlag += [3]
+            print "ERROR with Raster for", state_name, county_name
+            errorCounties += [[state_name, county_name, 'addRasterInfo']]
                 
     errorCounties = np.array(errorCounties)
-    print "Counties that had errors:\n", errorCounties
+    print "\nCounties that had errors:\n", errorCounties
 
     ############################
     ####### CLEANUP ############
