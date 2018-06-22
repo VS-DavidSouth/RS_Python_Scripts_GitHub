@@ -31,8 +31,11 @@ finalFiles = findFinalFiles()
 
 for filepath in finalFiles:
         if findField(filepath, "OID_Copy") == False:
-            if any ([yep in filepath for yep in yepList]):
-                arcpy.AddField_management(in_table = filepath, field_name = "OID_Copy", field_type = "SHORT", field_precision = "", field_scale = "", field_length = "", field_alias = "", field_is_nullable = "NULLABLE", field_is_required = "NON_REQUIRED", field_domain = "")
-                arcpy.CalculateField_management(in_table = filepath, field = "OID_Copy", expression = "!OBJECTID!", expression_type = "PYTHON", code_block = "")                                            
+            #if any ([yep in filepath for yep in yepList]):
+            arcpy.AddField_management(in_table = filepath, field_name = "OID_Copy", field_type = "SHORT", field_precision = "", field_scale = "", field_length = "", field_alias = "", field_is_nullable = "NULLABLE", field_is_required = "NON_REQUIRED", field_domain = "")
+            arcpy.CalculateField_management(in_table = filepath, field = "OID_Copy", expression = "!OBJECTID!", expression_type = "PYTHON", code_block = "")                                            
 
-                print filepath, "completed."
+            print filepath, "completed."
+
+        else:
+          print filepath, "already has an OID_Copy field."
