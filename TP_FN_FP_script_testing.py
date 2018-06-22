@@ -1,9 +1,7 @@
 from Creating_TP_FN_FP_files import *
 import numpy as np
-import arcpy, arcinfo, os
+import arcpy, os
 
-
-print "Ready to test."
 
 def testCounties():
     global errorList, batchList, filteredFinalFilesList, summaryStats
@@ -34,9 +32,4 @@ def testCounties():
 
     print np.array(errorList)
 
-def addRasterInfo(inputPointData, rasterDataset):
-    
-    arcpy.CheckOutExtension("Spatial")
-    arcpy.sa.ExtractMultiValuesToPoints (inputPointData, [[rasterDataset, 'ProbSurf_1']], "NONE")
-    arcpy.sa.ExtractMultiValuesToPoints (inputPointData, [[rasterDataset, 'ProbSurf_2']], "BILINEAR")
-    arcpy.CheckInExtension("Spatial")
+print "Ready to test."

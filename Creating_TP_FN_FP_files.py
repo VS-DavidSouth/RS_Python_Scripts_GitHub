@@ -48,6 +48,9 @@ from Converting_state_names_and_abreviations import *
 # location of CSV with summary satistics, such as Collect Events which is used to tell TP from FN
 summaryStatsCSV = r'O:\AI Modeling Coop Agreement 2017\David_working\Remote_Sensing_Procedure\Stats_summary.csv'
 
+# location of the CSV file containing file paths of _Final files
+finalFileLocations = r'O:\AI Modeling Coop Agreement 2017\David_working\Remote_Sensing_Procedure\FileLocations.csv'
+
 # location of probability surface raster
 probSurface = r'N:\FLAPS from Chris Burdett\Data\poultry_prob_surface\poultryMskNrm\poultryMskNrm.tif'
 
@@ -109,10 +112,10 @@ def findRowCount(state_abbrev, county_name):
         if (row[0][:2] == state_abbrev) and (row[1] == county_name):
             return row[8]
     
-def specificCountyFile(file_list, state_abbrev, county_name, final):
+def specificCountyFile(file_list, state_abbrev, county_name):
     ##
     ## This fuction searches through a list of filepaths and finds the one for the
-    ##  appropriate state. This can be used for batchList, filteredFilesList, etc.
+    ##  appropriate state. This can be used for batchList, finalFiles, etc.
     ##
     ##          file_list:  the list of filepaths that this function will sort through
     ##          state_abbrev & county_name: state abbreviation and county name
@@ -120,31 +123,36 @@ def specificCountyFile(file_list, state_abbrev, county_name, final):
     ##                       the function is searching for '_FINAL' files
     ##
             
-    yepList = ['_FINAL_FINAL', '_Final_FINAL', '_FINAL2', '_FINAL', '_Final']
+    #yepList = ['_FINAL_FINAL', '_Final_FINAL', '_FINAL2', '_FINAL', '_Final']
     state_name = state_abbrev_to_name[state_abbrev]
     state_name = state_name.replace(' ', '')
 
+    ## Note the following several lines of code were from before the FileLocations
+    ##  CSV was created. It is saved here for posterity, even though it isn't
+    ##  relevant anymore. It may be able to be reused.
 
-    if final == True:
-        row_count = summaryStats[8]
-        for yep in yepList:    
-            for file_path in file_list:
-                if yep in file_path and state_name in file_path and county_name in file_path:
-                    return file_path
+    #if final == True:
+    #    row_count = summaryStats[8]
+    #    for yep in yepList:    
+    #        for file_path in file_list:
+    #            if yep in file_path and state_name in file_path and county_name in file_path:
+    #                return file_path
                         ## This loop goes through yepList and checks to see
                         ##  if each file_path has a version of _FINAL as
                         ##  well as the correct state name and county name.
                         ##  It chooses based on the order of yepList, and
                         ##  thus chooses _FINAL_FINAL prerentially to the rest.
                         ##  It returns the chosen file_path from the list.
+
+    
             
-    if final == False:
-        for file_path in file_list:    
-            if state_name in file_path and county_name in file_path:  
-                return file_path              
-                        ## This loop only checks for the proper state and
-                        ## county names before returning the first one.
-            
+    #if final == False:
+    for file_path in file_list:    
+        if state_name in file_path and county_name in file_path:  
+            return file_path              
+                    ## This loop only checks for the proper state and
+                    ## county names before returning the first one.
+        
 def findBatchFiles():
     ##
     ## This function looks through the A:\ Drive to find all the files with the
@@ -182,12 +190,12 @@ def findBatchFiles():
     
     return batchList
 
-def findFinalFiles():
+def findFinalFiles_outdated():
     ##
     ## This function 'walks' through all files in the A: drive collects the locations
     ##  of all _FINAL files.
     ##
-    global filteredFilesList
+    global finalFiles
     
     folderLocation = r'A:'  # this is the folder that this function will search through
     summaryStats = collectSummaryStats()    # create the summaryStats numpy array that contains important information on the counties
@@ -197,7 +205,7 @@ def findFinalFiles():
 
 
     filesList = []     # this will hold all files from A: with 'FINAL' in the name
-    filteredFilesList = []    # this will hold the filtered filesList, not containing anything in nopeList
+    finalFiles = []    # this will hold the filtered filesList, not containing anything in nopeList
 
     nopeList = ['Project Documents', 'Confidence3', 'Copy', 'Test', 'test', 'SpatialJ']
         ## If any file has one or more of the items in this list within it, it will not
@@ -209,12 +217,26 @@ def findFinalFiles():
             if '_Prem' in filename:     # this is not '_Prems' because at least one filename doesn't have the 's'
                 filesList.append(filepath)
 
-    filteredFilesList = [filepath for filepath in filesList if not any(nope in filepath for nope in nopeList)]
+    finalFiles = [filepath for filepath in filesList if not any(nope in filepath for nope in nopeList)]
         ## Check to see if any of the phrases from nopeList are in the filepath, if
-        ##  they aren't present then include them in the filteredFilesList.
+        ##  they aren't present then include them in the finalFiles.
 
-    return filteredFilesList
+    return finalFiles
 
+def findFinalFiles():
+    ##
+    ## 
+    finalFiles = []  # this will be filled with the _FINAL file paths
+    
+    with open(finalFileLocations, 'rb') as CSVfile:
+        reader = csv.reader(CSVfile)
+        for row in reader:
+            if not row[0] == '':         
+                finalFiles.append(row[8].replace('D:', 'A:'))
+
+    finalFiles = np.array (finalFiles)
+    return finalFiles
+    
 def createTP_FN(state_abbrev, county_name):
     ##
     ## This function creates a file containing all TP and FN and labels them
@@ -224,7 +246,7 @@ def createTP_FN(state_abbrev, county_name):
     global Final, TP_FN
 
     # define the path to the input file that will be used to determine both TP and FN
-    Final = specificCountyFile(filteredFilesList, state_abbrev, county_name, True)
+    Final = specificCountyFile(finalFiles, state_abbrev, county_name)
 
     # define the path to the _TP_FN output file, which will later get renamed as _TP_FN_FP
     TP_FN = os.path.join(outputFolder, state_abbrev + '_' + county_name + '_TP_FN')
@@ -265,7 +287,7 @@ def addFP(state_abbrev, county_name):
     state_name = state_name.replace(' ', '')
 
     # define the _batch file to be clipped
-    batch = specificCountyFile(batchList, state_abbrev, county_name, False)
+    batch = specificCountyFile(batchList, state_abbrev, county_name)
 
     # define the location of the county file to clip the batch to
     county_outline = os.path.join(r'N:\Remote Sensing Projects\2016 Cooperative Agreement Poultry Barns\Documents\Deliverables\Library\CountyOutlines', \
@@ -346,7 +368,7 @@ if __name__ == '__main__':
     summaryStats = collectSummaryStats() # create the 'summaryStats' numpy array
 
     print "Finding _FINAL files..."
-    filteredFilesList = findFinalFiles()   # create a list of the file locaitons of all the _FINAL files (and similar) on the A: drive
+    finalFiles = findFinalFiles()   # create a list of the file locaitons of all the _FINAL files (and similar) on the A: drive
     print "_FINAL files found. Script duration so far:", checkTime()
 
     print "Finding _Batch files..."
@@ -388,8 +410,12 @@ if __name__ == '__main__':
             print "ERROR with Raster for", state_name, county_name
             errorCounties += [[state_name, county_name, 'addRasterInfo']]
                 
-    errorCounties = np.array(errorCounties)
-    print "\nCounties that had errors:\n", errorCounties
+    if errorCounties = []:
+        print "\nThere were no counties that had errors.\n"
+
+    else:
+        errorCounties = np.array(errorCounties)
+        print "\nCounties that had errors:\n", errorCounties
 
     ############################
     ####### CLEANUP ############
