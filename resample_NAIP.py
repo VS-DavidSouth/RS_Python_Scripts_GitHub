@@ -4,9 +4,13 @@
 
 import arcpy, os
 
+# this next line gives us access to the nameFormat function
+sys.path.insert(0, r'O:\AI Modeling Coop Agreement 2017\David_working\Python') 
+from Converting_state_names_and_abreviations import *
+
 def resample(input_raster, output_location, state_abbrev, county_name):
     ##
-    ## This function reprojectes the selected file to 2m resolution.
+    ## This function reprojects the selected raster to 2m resolution.
     ##
     ## Input Variables:
     ##      input_raster:   The file location of the native NAIP imagery.
@@ -20,7 +24,7 @@ def resample(input_raster, output_location, state_abbrev, county_name):
     ##                                   example, and the respective county name,
     ##                                   such as 'Union'.
     ##
-    outputName = 'NAIP_2m_' + state_abbrev + '_' + county_name
+    outputName = 'NAIP_2m_' + state_abbrev + '_' + nameFormat(county_name)
     if not arcpy.Exists(os.path.join(output_location, outputName)):
         if arcpy.Exists(input_raster):
             print "Resampling", state_abbrev, county_name, "..."
@@ -35,3 +39,5 @@ def resample(input_raster, output_location, state_abbrev, county_name):
 
 if __name__ == '__main__':
     ()    
+
+    

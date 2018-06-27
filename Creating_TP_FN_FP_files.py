@@ -4,7 +4,7 @@
 ####### DESCRIPTION ########
 ############################
 
-## Created by David South 5/30/18, updated N/A
+## Created by David South 5/30/18, updated 6/20/18
 ##
 ## Script description: This script will take the results from the county-level
 ##  Remote Sensing procedure and export a file with [county] being
