@@ -55,18 +55,8 @@ def createGDB(folderLocation, state_abbrev, clusterName):
     if not arcpy.Exists( os.path.join(folderLocation, clusterName) ):
         # create GDB
         arcpy.CreateFileGDB_management(out_folder_path = folderLocation, out_name = clusterName, out_version = "CURRENT")
-            
-    # check if MXD exists
-    if not arcpy.Exists(os.path.join(folderLocation, clusterName + '.mxd')):
-        # create MXD    ## this may not actually be possible in arcMap
-        
-
-    # check if county outline is in MXD:
-        # add county outline to MXD
-
-    # check to see if the 2m NAIP imagery exists (if yes):
-        # check if 2m NAIP imagery is in MXD
-            # add 2m NAIP to MXD
+    else:
+        print state_abbrev, clusterName, "already exists."
 
 ############################
 ####### DO STUFF ###########

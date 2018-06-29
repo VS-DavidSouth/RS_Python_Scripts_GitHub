@@ -25,6 +25,6 @@ arcpy.Integrate_management(in_features="'%s Group\%sCo_Int' #" %(county, county)
 	
 arcpy.CollectEvents_stats(Input_Incident_Features="%s Group\%sCo_Int" %(county, county), Output_Weighted_Point_Feature_Class="A:/Alabama/AL1cluster.gdb/%sCo_Int_CollectEvents" %(county))
 
-# project it into WGS 1984 Geographic Coordinate System
+# project it into WGS 1984 Geographic Coordinate System?
 
 arcpy.AddXY_management(in_features)
