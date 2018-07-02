@@ -216,7 +216,7 @@ def findField (featureClass, fieldName):
     else:
         return False
 
-def exportCounty (inputFile, outputLocation, countyName, state, FIPS):
+def exportCounty (inputFile, outputLocation, countyName, stateName, FIPS):
     ##
     ## Function description:
     ##      This function will create one single-county file, derived from the inputFile.
@@ -247,7 +247,7 @@ def exportCounty (inputFile, outputLocation, countyName, state, FIPS):
     UTM = int(decideUTM(str(FIPS)))
 
     ## Decide the name for the output file
-    countyFileName = nameFormat(countyName) + "Co" + state_name_to_abbrev[state] + "_outline"
+    countyFileName = nameFormat(countyName) + "Co" + nameFormat(state_name_to_abbrev[stateName]) + "_outline"
     countyFileNameUnprojected = countyFileName + '_unprojected'
     countyFileFull = os.path.join(outputLocation, countyFileName)
 
@@ -273,7 +273,8 @@ def exportCounty (inputFile, outputLocation, countyName, state, FIPS):
         arcpy.Project_management(in_dataset = os.path.join('in_memory', countyFileNameUnprojected), \
                                  out_dataset = countyFileFull, \
                                  out_coor_system = "PROJCS['NAD_1983_UTM_Zone_%sN',GEOGCS['GCS_North_American_1983',DATUM['D_North_American_1983',SPHEROID['GRS_1980',6378137.0,298.257222101]],PRIMEM['Greenwich',0.0],UNIT['Degree',0.0174532925199433]],PROJECTION['Transverse_Mercator'],PARAMETER['False_Easting',500000.0],PARAMETER['False_Northing',0.0],PARAMETER['Central_Meridian',%s],PARAMETER['Scale_Factor',0.9996],PARAMETER['Latitude_Of_Origin',0.0],UNIT['Meter',1.0]]" %(UTM, centralMeridian[UTM]), \
-                                 transform_method = "WGS_1984_(ITRF00)_To_NAD_1983", in_coor_system = "GEOGCS['GCS_WGS_1984',DATUM['D_WGS_1984',SPHEROID['WGS_1984',6378137.0,298.257223563]],PRIMEM['Greenwich',0.0],UNIT['Degree',0.0174532925199433]]", preserve_shape="NO_PRESERVE_SHAPE", max_deviation = "", vertical = "NO_VERTICAL")
+                                 transform_method = "WGS_1984_(ITRF00)_To_NAD_1983", in_coor_system = "GEOGCS['GCS_WGS_1984',DATUM['D_WGS_1984',SPHEROID['WGS_1984',6378137.0,298.257223563]],PRIMEM['Greenwich',0.0],UNIT['Degree',0.0174532925199433]]", \
+                                 preserve_shape = "NO_PRESERVE_SHAPE", max_deviation = "", vertical = "NO_VERTICAL")
 
         ## Delete the '_unprojected' file that is stored in memory because it is no longer needed
         arcpy.Delete_management(in_data = os.path.join('in_memory', countyFileNameUnprojected + '.shp'), data_type = "")
@@ -287,19 +288,20 @@ def exportCounty (inputFile, outputLocation, countyName, state, FIPS):
                 row[0] = decideUTM(FIPS)
                 UTM_field.updateRow(row)
 
-        print (countyName + " county shapefile exported to geodatabase.")
+        print (stateName + " " + countyName + " county shapefile exported to geodatabase.")
 
     else:
-        print(countyName + " county shapefile already exists.")
+        print (stateName + " " + countyName + " county shapefile already exists.")
 
 ######### Running the script ###################
 
 if __name__ == '__main__':
 
     ## Determine if you want to skip past some that have already been completed so that the code is faster
-    skip = False
-    startValue = 2468 # The OBJECTID value of the county that you want to start at, in the form of an integer
-    
+    skip = True
+    startValue = 171 ## The OBJECTID value of the county that you want to start at, in the form of an integer
+                     ##  Simply type county[3] into the shell after an error to determine hte correct startValue
+                      
     #create_state_GDBs(databaseFolder) ## Uncomment to create the GDB file structure
 
     ## In case the UTM reference file is not created, this will create it
@@ -320,11 +322,14 @@ if __name__ == '__main__':
     ## Loop for each county in the counties file
     with arcpy.da.SearchCursor(countiesFile, ['NAME', 'STATE_NAME', 'FIPS', 'OBJECTID'], where_clause = contigUS) as allCounties:
         for county in allCounties:
+            
             countyName = county[0]
-            stateName = nameFormat(county[1])
+            stateName = county[1]
+            GDB_name = stateName + '.gdb'
+            GDB_location = os.path.join(databaseFolder,GDB_name)
             FIPS = str(county[2])
             
-            exportCounty(countiesFile, os.path.join(databaseFolder,stateName + '.gdb') , \
+            exportCounty(countiesFile, GDB_location, \
                          countyName, stateName, FIPS)     # This is saying that it will use countiesFile as the source of the county files, it will place the new files in the state database folders,
                                                           # and will use the county name, state name, and FIPS code of each county.
 
