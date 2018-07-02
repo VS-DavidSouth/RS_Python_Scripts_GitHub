@@ -239,6 +239,10 @@ def exportCounty (inputFile, outputLocation, countyName, stateName, FIPS):
     ##
 
     OVERWRITE = True  ## CHANGE THIS TO 'False' IF YOU DON'T WANT FILES OVERWRITTEN
+
+    ## Quickly format any names to prevent errors
+    countyName = nameFormat(countyName)
+    stateName = nameFormat(stateName)
     
     ## Create SQL statement to isolate only that county
     FIPS_SQL = "FIPS = '%s'" %FIPS
@@ -247,7 +251,7 @@ def exportCounty (inputFile, outputLocation, countyName, stateName, FIPS):
     UTM = int(decideUTM(str(FIPS)))
 
     ## Decide the name for the output file
-    countyFileName = nameFormat(countyName) + "Co" + nameFormat(state_name_to_abbrev[stateName]) + "_outline"
+    countyFileName = countyName + "Co" + nameFormat(state_name_to_abbrev[stateName]) + "_outline"
     countyFileNameUnprojected = countyFileName + '_unprojected'
     countyFileFull = os.path.join(outputLocation, countyFileName)
 
@@ -258,6 +262,10 @@ def exportCounty (inputFile, outputLocation, countyName, stateName, FIPS):
 
         if arcpy.Exists(countyFileFull):
             arcpy.Delete_management(countyFileFull)
+
+    ## Just in case there was an error last time this was ran, this line deletes the unprojected temp file
+    if arcpy.Exists(os.path.join('in_memory', countyFileNameUnprojected)):
+        arcpy.Delete_management(os.path.join('in_memory', countyFileNameUnprojected))
     
     ## Determine if the file already exists
     if not arcpy.Exists(countyFileFull):   
@@ -275,6 +283,11 @@ def exportCounty (inputFile, outputLocation, countyName, stateName, FIPS):
                                  out_coor_system = "PROJCS['NAD_1983_UTM_Zone_%sN',GEOGCS['GCS_North_American_1983',DATUM['D_North_American_1983',SPHEROID['GRS_1980',6378137.0,298.257222101]],PRIMEM['Greenwich',0.0],UNIT['Degree',0.0174532925199433]],PROJECTION['Transverse_Mercator'],PARAMETER['False_Easting',500000.0],PARAMETER['False_Northing',0.0],PARAMETER['Central_Meridian',%s],PARAMETER['Scale_Factor',0.9996],PARAMETER['Latitude_Of_Origin',0.0],UNIT['Meter',1.0]]" %(UTM, centralMeridian[UTM]), \
                                  transform_method = "WGS_1984_(ITRF00)_To_NAD_1983", in_coor_system = "GEOGCS['GCS_WGS_1984',DATUM['D_WGS_1984',SPHEROID['WGS_1984',6378137.0,298.257223563]],PRIMEM['Greenwich',0.0],UNIT['Degree',0.0174532925199433]]", \
                                  preserve_shape = "NO_PRESERVE_SHAPE", max_deviation = "", vertical = "NO_VERTICAL")
+
+       # arcpy.Project_management(in_dataset = "BernalilloCoNM_outline_unprojected", out_dataset="O:/AI Modeling Coop Agreement 2017/David_working/TEST.gdb/Bern_proj_test", \
+        #                         out_coor_system = "PROJCS['NAD_1983_UTM_Zone_13N',GEOGCS['GCS_North_American_1983',DATUM['D_North_American_1983',SPHEROID['GRS_1980',6378137.0,298.257222101]],PRIMEM['Greenwich',0.0],UNIT['Degree',0.0174532925199433]],PROJECTION['Transverse_Mercator'],PARAMETER['False_Easting',500000.0],PARAMETER['False_Northing',0.0],PARAMETER['Central_Meridian',-105.0],PARAMETER['Scale_Factor',0.9996],PARAMETER['Latitude_Of_Origin',0.0],UNIT['Meter',1.0]]", \
+         #                        transform_method = "WGS_1984_(ITRF00)_To_NAD_1983", in_coor_system = "GEOGCS['GCS_WGS_1984',DATUM['D_WGS_1984',SPHEROID['WGS_1984',6378137.0,298.257223563]],PRIMEM['Greenwich',0.0],UNIT['Degree',0.0174532925199433]]", \
+          #                       preserve_shape = "NO_PRESERVE_SHAPE", max_deviation="", vertical="NO_VERTICAL")
 
         ## Delete the '_unprojected' file that is stored in memory because it is no longer needed
         arcpy.Delete_management(in_data = os.path.join('in_memory', countyFileNameUnprojected + '.shp'), data_type = "")
@@ -325,7 +338,7 @@ if __name__ == '__main__':
             
             countyName = county[0]
             stateName = county[1]
-            GDB_name = stateName + '.gdb'
+            GDB_name = nameFormat(stateName) + '.gdb'
             GDB_location = os.path.join(databaseFolder,GDB_name)
             FIPS = str(county[2])
             
