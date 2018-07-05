@@ -3,6 +3,9 @@
 ##
 ## This scirpt would be great to make an ArcGIS tool out of.
 ##
+## Note: as the script stands now, save each individual step along the way
+##  Have a boolean that allows you to save all steps, or not
+##
 
 counties = []
 
