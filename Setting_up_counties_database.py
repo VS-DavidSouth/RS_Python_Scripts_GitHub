@@ -118,7 +118,7 @@ def create_state_GDBs (outputFolder):
             stateF = nameFormat(state) # The 'F' stands for Formatted
             
             ## Only run for the contiguous US
-            if not (state == 'Hawaii') and not (state == 'Alaska'):
+            if not (stateF == 'Hawaii') and not (stateF == 'Alaska'):
 
                 print ("Creating geodatabase for %s..." %state)
 
