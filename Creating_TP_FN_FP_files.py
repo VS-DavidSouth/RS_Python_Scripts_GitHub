@@ -24,7 +24,7 @@
 ##  will likely format it as North_Carolina. This can (and will) cause errors.
 
 ############################
-####### SETUP ##############
+########## SETUP ###########
 ############################
 
 import time
@@ -42,7 +42,7 @@ sys.path.insert(0, r'O:\AI Modeling Coop Agreement 2017\David_working\Python') #
 from Converting_state_names_and_abreviations import *
 
 ############################
-####### PARAMETERS #########
+######## PARAMETERS ########
 ############################
 
 # location of CSV with summary satistics, such as Collect Events which is used to tell TP from FN
@@ -58,7 +58,7 @@ probSurface = r'N:\FLAPS from Chris Burdett\Data\poultry_prob_surface\poultryMsk
 outputFolder = r'O:\AI Modeling Coop Agreement 2017\David_working\Remote_Sensing_Procedure\TP_FN_FP.gdb'
 
 ############################
-###### DEFINE FUNCTIONS ####
+##### DEFINE FUNCTIONS #####
 ############################
 
 def checkTime():
@@ -340,7 +340,7 @@ def addFP(state_abbrev, county_name):
                                     expression_type = "PYTHON_9.3", \
                                     code_block = "def fn(y):\n  if (y is None):\n    return (9)\n  else:\n    return y")
         
-def addRasterInfo(inputPointData, rasterDataset):
+def addRasterInfo(input_point_data, raster_dataset):
     ##
     ## This function extracts the values from the input raster
     ##  raster and creates two new fields in the TP_FN_FP file,
@@ -350,13 +350,13 @@ def addRasterInfo(inputPointData, rasterDataset):
     ##
     arcpy.CheckOutExtension("Spatial")  # this just allows the script to access the Spatial Analyst ArcGIS extension
     
-    arcpy.sa.ExtractMultiValuesToPoints (inputPointData, [[rasterDataset, 'ProbSurf_1']], "NONE")
-    arcpy.sa.ExtractMultiValuesToPoints (inputPointData, [[rasterDataset, 'ProbSurf_2']], "BILINEAR")
+    arcpy.sa.ExtractMultiValuesToPoints (input_point_data, [[raster_dataset, 'ProbSurf_1']], "NONE")
+    arcpy.sa.ExtractMultiValuesToPoints (input_point_data, [[raster_dataset, 'ProbSurf_2']], "BILINEAR")
     
     arcpy.CheckInExtension("Spatial")   # this makes sure that a license does not remain in use for the Spatial Analyst extension
     
 ############################
-####### DO STUFF ###########
+######### DO STUFF #########
 ############################
 
 if __name__ == '__main__':
@@ -418,10 +418,10 @@ if __name__ == '__main__':
         print "\nCounties that had errors:\n", errorCounties
 
     ############################
-    ####### CLEANUP ############
+    ######### CLEANUP ##########
     ############################
 
     print "---------------------\nSCRIPT COMPLETE!"
-    print "The script took a total of", checkTime(), "."
+    print "The script took a total of", checkTime() + "."
     print "---------------------"
 

@@ -40,27 +40,28 @@ with arcpy.da.SearchCursor(centroidsFile, ['NAME', 'STATE_NAME', 'FIPS', 'OBJECT
         reprojectedFile = originalFile + '_reproj'
 
         ## reproject the file
-        #if not arcpy.Exists(reprojectedFile):
-        #    arcpy.Project_management(in_dataset = originalFile, \
-        #                             out_dataset = reprojectedFile, \
-        #                             out_coor_system = "PROJCS['NAD_1983_UTM_Zone_%sN',GEOGCS['GCS_North_American_1983',DATUM['D_North_American_1983',SPHEROID['GRS_1980',6378137.0,298.257222101]],PRIMEM['Greenwich',0.0],UNIT['Degree',0.0174532925199433]],PROJECTION['Transverse_Mercator'],PARAMETER['False_Easting',500000.0],PARAMETER['False_Northing',0.0],PARAMETER['Central_Meridian',%s],PARAMETER['Scale_Factor',0.9996],PARAMETER['Latitude_Of_Origin',0.0],UNIT['Meter',1.0]]" %(UTM, centralMeridian[float(UTM)]), \
-        #                             transform_method = "", in_coor_system = "PROJCS['NAD_1983_UTM_Zone_%s',GEOGCS['GCS_North_American_1983',DATUM['D_North_American_1983',SPHEROID['GRS_1980',6378137.0,298.257222101]],PRIMEM['Greenwich',0.0],UNIT['Degree',0.0174532925199433]],PROJECTION['Transverse_Mercator'],PARAMETER['False_Easting',500000.0],PARAMETER['False_Northing',0.0],PARAMETER['Central_Meridian',%s],PARAMETER['Scale_Factor',0.9996],PARAMETER['Latitude_Of_Origin',0.0],UNIT['Meter',1.0]]" %(UTM, centralMeridian[float(UTM)]), \
-        #                             preserve_shape = "NO_PRESERVE_SHAPE", max_deviation = "", vertical = "NO_VERTICAL")
-        #else:
-        #    print("Reprojected file for %s already exists, skipping." %county[0])
+        if not arcpy.Exists(reprojectedFile):
+            arcpy.Project_management(in_dataset = originalFile, \
+                                     out_dataset = reprojectedFile, \
+                                     out_coor_system = "PROJCS['NAD_1983_UTM_Zone_%sN',GEOGCS['GCS_North_American_1983',DATUM['D_North_American_1983',SPHEROID['GRS_1980',6378137.0,298.257222101]],PRIMEM['Greenwich',0.0],UNIT['Degree',0.0174532925199433]],PROJECTION['Transverse_Mercator'],PARAMETER['False_Easting',500000.0],PARAMETER['False_Northing',0.0],PARAMETER['Central_Meridian',%s],PARAMETER['Scale_Factor',0.9996],PARAMETER['Latitude_Of_Origin',0.0],UNIT['Meter',1.0]]" %(UTM, centralMeridian[float(UTM)]), \
+                                     transform_method = "", in_coor_system = "PROJCS['NAD_1983_UTM_Zone_%s',GEOGCS['GCS_North_American_1983',DATUM['D_North_American_1983',SPHEROID['GRS_1980',6378137.0,298.257222101]],PRIMEM['Greenwich',0.0],UNIT['Degree',0.0174532925199433]],PROJECTION['Transverse_Mercator'],PARAMETER['False_Easting',500000.0],PARAMETER['False_Northing',0.0],PARAMETER['Central_Meridian',%s],PARAMETER['Scale_Factor',0.9996],PARAMETER['Latitude_Of_Origin',0.0],UNIT['Meter',1.0]]" %(UTM, centralMeridian[float(UTM)]), \
+                                     preserve_shape = "NO_PRESERVE_SHAPE", max_deviation = "", vertical = "NO_VERTICAL")
+        else:
+            print("Reprojected file for %s already exists, skipping." %county[0])
             
         ## delete the original file
-        #arcpy.Delete_management(originalFile)
+        arcpy.Delete_management(originalFile)
         
         ## rename the file to what it should be
-        #arcpy.Rename_management(in_data = reprojectedFile, out_data = originalFile, data_type = "FeatureClass")
+        arcpy.Rename_management(in_data = reprojectedFile, out_data = originalFile, data_type = "FeatureClass")
 
-        #print(county[0] + " reprojected.")
+        print(county[0] + " reprojected.")
 
-        arcpy.DefineProjection_management(in_dataset = originalFile, \
-                                          coor_system = "PROJCS['NAD_1983_UTM_Zone_%sN',GEOGCS['GCS_North_American_1983',DATUM['D_North_American_1983',SPHEROID['GRS_1980',6378137.0,298.257222101]],PRIMEM['Greenwich',0.0],UNIT['Degree',0.0174532925199433]],PROJECTION['Transverse_Mercator'],PARAMETER['False_Easting',500000.0],PARAMETER['False_Northing',0.0],PARAMETER['Central_Meridian',%s],PARAMETER['Scale_Factor',0.9996],PARAMETER['Latitude_Of_Origin',0.0],UNIT['Meter',1.0]]" %(UTM, centralMeridian[float(UTM)]))
 
-        print(county[0] + " completed.")
+        ### NOTE: The line below is only used if things were projected incorrectly.
+        ###  The line below simply renames the projection, it does not reproject anyhting.
+        #arcpy.DefineProjection_management(in_dataset = originalFile, \
+        #                                  coor_system = "PROJCS['NAD_1983_UTM_Zone_%sN',GEOGCS['GCS_North_American_1983',DATUM['D_North_American_1983',SPHEROID['GRS_1980',6378137.0,298.257222101]],PRIMEM['Greenwich',0.0],UNIT['Degree',0.0174532925199433]],PROJECTION['Transverse_Mercator'],PARAMETER['False_Easting',500000.0],PARAMETER['False_Northing',0.0],PARAMETER['Central_Meridian',%s],PARAMETER['Scale_Factor',0.9996],PARAMETER['Latitude_Of_Origin',0.0],UNIT['Meter',1.0]]" %(UTM, centralMeridian[float(UTM)]))
 
 print("****************************************************************")
 print("                            COMPLETED!")
