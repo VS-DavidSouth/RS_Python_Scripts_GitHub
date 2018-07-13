@@ -17,7 +17,7 @@
 import time
 start_time = time.time()
 
-import arcpy, os
+import arcpy, os, sys
 
 # this next line gives us access to the nameFormat function
 sys.path.insert(0, r'O:\AI Modeling Coop Agreement 2017\David_working\Python') 
@@ -31,21 +31,18 @@ from Converting_state_names_and_abreviations import *
 ####### PARAMETERS #########
 ############################
 
-first10counties = [     ## This list holds the first 10 counties in Alabama
-    'Barbour',          ##  alphabetically. We are running these first to 
-    'Blount',           ##  get a full batch complete.
-    'Bullock',
-    'Butler',
-    'Calhoun',
-    'Cherokee',
-    'Clay',
-    'Cleburne',
-    'Coffee',
-    'Colbert',
+states2do = [
+    'Illinois',       
+    'Michigan',          
+    'New York',
+    'Oregon',
+    'South Dakota',
+    'Washington',
+    'West Virginia',
     ]
 
-NAIP_folder = r'N:\Remote Sensing Projects\2016 Cooperative Agreement Poultry Barns\Documents\Poultry Population Modeling Project\Rdrive\Imagery\NAIP'
-NAIP2m_folder = r'N:\Remote Sensing Projects\2016 Cooperative Agreement Poultry Barns\Documents\Poultry Population Modeling Project\Rdrive\Imagery\NAIP2m'
+NAIP_folder = r'R:\Nat_Hybrid_Poultry\Imagery\NAIP'
+NAIP2m_folder = r'R:\Nat_Hybrid_Poultry\Imagery\NAIP2m'
 
 ############################
 ###### DEFINE FUNCTIONS ####
@@ -77,11 +74,11 @@ def create_state_GDBs (outputFolder, state_list):
     ##
         
     ## Loop for each state
-    for state_abbrev in state_list:
+    for state_name in state_list:
 
-        state_name = nameFormat(state_abbrev_to_name[state_abbrev])
+        state_name = nameFormat(state_name)
 
-        GDB = 'NAIP2m_' + state_abbrev
+        GDB = state_name    # Note that this should not have '.gdb' as part of it, it will be added later
 
         print ("Creating geodatabase for %s..." %state_name)
 
@@ -145,6 +142,19 @@ def resample(input_raster, output_location, state_abbrev, county_name):
     else:
         print "-- Resampled raster for", state_abbrev, county_name, "already exists!"
             # may want to remove the above line in case it gets annoying for users
+
+def walkFolder(folderLocation):
+    walk = arcpy.da.Walk(folderLocation, datatype = "RasterDataset")
+
+    walkList = []   ## This will hold all of the file paths to the files wuithin the folder
+
+    for dirpath, dirnames, filenames in walk:
+        for filename in filenames:
+            if filename[-4:] == '.sid':
+                walkList.append([os.path.basename(dirpath)[:-4], os.path.join(dirpath, filename)])
+
+    return walkList
+
     
 ############################
 ####### DO STUFF ###########
@@ -154,29 +164,31 @@ if __name__ == '__main__':
 #if __name__ == 'LEEEEERRRRROOOYYYYY JJJJJEEENNNKKKKIINNNSSSSSSSSSS':
 
     print "Creating GDBs..."
-    create_state_GDBs(NAIP2m_folder, ['AL'])
+    create_state_GDBs(NAIP2m_folder, states2do)
     print "GDBs created. Script duration so far:", checkTime(), '\n\n'
 
     print "Starting resampling process ...\n\n"
 
-    for county_name in first10counties:
+
+
+    for state_name in states2do:
 
         
                 
-        county_name = nameFormat(county_name)
-        state_abbrev = 'AL' ## CHANGE THIS LATER ##
-        state_name = nameFormat(state_abbrev_to_name[state_abbrev])
 
-        SID = findSID(state_abbrev, county_name)
+        state_abbrev = state_name_to_abbrev[state_name]
         
-        input_raster = os.path.join(NAIP_folder, \
-                                    state_name, \
-                                    county_name + 'Co' + state_abbrev,\
-                                    SID)
-                
-        output_location = os.path.join(NAIP2m_folder, 'NAIP2m_' + state_abbrev + '.gdb')
 
-        resample(input_raster, output_location, state_abbrev, county_name)
+        countyList = walkFolder(os.path.join(NAIP_folder, state_name))
+
+        for countyNAIP in countyList:
+
+            county_name = countyNAIP[0]
+            county_name = nameFormat(county_name)
+            input_raster = countyNAIP[1]
+            output_location = os.path.join(NAIP2m_folder, nameFormat(state_name) + '.gdb')
+
+            resample(input_raster, output_location, state_abbrev, county_name)
     
     ############################
     ####### CLEANUP ############

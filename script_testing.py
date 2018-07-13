@@ -1,0 +1,5 @@
+from resample_NAIP import *
+import numpy as np
+import arcpy, os
+
+print "Ready to test."

@@ -410,7 +410,7 @@ if __name__ == '__main__':
             print "ERROR with Raster for", state_name, county_name
             errorCounties += [[state_name, county_name, 'addRasterInfo']]
                 
-    if errorCounties = []:
+    if errorCounties == []:
         print "\nThere were no counties that had errors.\n"
 
     else:
