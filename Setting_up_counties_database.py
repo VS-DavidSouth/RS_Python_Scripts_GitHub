@@ -311,7 +311,7 @@ def exportCounty (inputFile, outputLocation, countyName, stateName, FIPS):
 if __name__ == '__main__':
 
     ## Determine if you want to skip past some that have already been completed so that the code is faster
-    skip = True
+    skip = False
     startValue = 171 ## The OBJECTID value of the county that you want to start at, in the form of an integer
                      ##  Simply type county[3] into the shell after an error to determine hte correct startValue
                       

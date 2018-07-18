@@ -169,7 +169,8 @@ if __name__ == '__main__':
 
     print "Starting resampling process ...\n\n"
 
-
+    errorStates = []    # This will hold the states that encounter errors
+    errorCounties = []  # This will hold the names of all counties that have errors during resampling.
 
     for state_name in states2do:
 
@@ -179,8 +180,11 @@ if __name__ == '__main__':
         state_abbrev = state_name_to_abbrev[state_name]
         
 
-        countyList = walkFolder(os.path.join(NAIP_folder, state_name))
+        countyList = walkFolder(os.path.join(NAIP_folder, nameFormat(state_name) ))
 
+        if countyList == []:
+            errorStates.append(state_name)
+        
         for countyNAIP in countyList:
 
             county_name = countyNAIP[0]
@@ -188,11 +192,25 @@ if __name__ == '__main__':
             input_raster = countyNAIP[1]
             output_location = os.path.join(NAIP2m_folder, nameFormat(state_name) + '.gdb')
 
-            resample(input_raster, output_location, state_abbrev, county_name)
-    
+            try:
+                resample(input_raster, output_location, state_abbrev, county_name)
+            except:
+                print "Error resampling", state_name, county_name + "."
+                errorCounties.append([state_name, county_name])
+
     ############################
     ####### CLEANUP ############
     ############################
+
+    if not errorStates == []:
+        print "\n\nStates that had errors:"
+        for state in errorStates:
+            print "    |",errorState, "|"
+
+    if not errorCounties == []:
+        print "\n\nCounties that had errors during resampling:"
+        for errorCounty in errorCounties:
+            print "    |", errorCounty[0], errorCounty[1], "|"
                 
     print "\n\n---------------------\nSCRIPT COMPLETE!"
     print "The script took a total of", checkTime(), "."
