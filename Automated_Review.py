@@ -129,54 +129,62 @@ def FIPS_UTM(county_file):
             return cursor[0], cursor[1]
 
 def add_FIPS_info(input_feature, state_abbrev, county_name):
-
-    state_name = nameFormat(state_abbrev_to_name[state_abbrev])
     
-    ## Location of county folder:
-    county_outline = os.path.join(county_outline_folder,
-                                      state_name + '.gdb',
-                                      county_name + 'Co' + state_abbrev + '_outline')
+    ## The following several lines are to check to see if the FIPS or FIPS2 fields exist
+    fieldList = [field.name for field in arcpy.ListFields(input_feature)] # Creates a list of all fields in that feature class
 
-    FIPS, UTM = FIPS_UTM(county_outline)
-    
-    ## Add a new field to store FIPS information. This field will hold the FIPS but remove leading zeroes
-    arcpy.AddField_management(in_table = input_feature, field_name = "FIPS", \
-                              field_type = "SHORT", field_precision = "", \
-                              field_scale = "", field_length = "", field_alias = "", \
-                              field_is_nullable = "NULLABLE", \
-                              field_is_required = "NON_REQUIRED", field_domain = "")
+    ## Checks if the fieldName is in the list that was just generated as fieldList
+    if "FIPS" in fieldList or "FIPS2" in fieldList:
+        print "File already has FIPS fields."
+        
+    else:
+        state_name = nameFormat(state_abbrev_to_name[state_abbrev])
+        
+        ## Location of county folder:
+        county_outline = os.path.join(county_outline_folder,
+                                          state_name + '.gdb',
+                                          county_name + 'Co' + state_abbrev + '_outline')
 
-    ## Fill FIPS field with UTM info
-    #arcpy.CalculateField_management(in_table = input_feature, field = "FIPS", \
-    #                                expression = FIPS, \
-    #                                expression_type = "PYTHON_9.3", )
-    #                                #code_block = 'def fn(num):\n  if num <= %s:\n    return (1)\n  elif num > %s:\n    return (2)' %(collectEvents, collectEvents))
+        FIPS, UTM = FIPS_UTM(county_outline)
+        
+        ## Add a new field to store FIPS information. This field will hold the FIPS but remove leading zeroes
+        arcpy.AddField_management(in_table = input_feature, field_name = "FIPS", \
+                                  field_type = "SHORT", field_precision = "", \
+                                  field_scale = "", field_length = "", field_alias = "", \
+                                  field_is_nullable = "NULLABLE", \
+                                  field_is_required = "NON_REQUIRED", field_domain = "")
 
-    ## Fill newly created UTM field with the proper UTM
-    with arcpy.da.UpdateCursor(input_feature, ['FIPS']) as cursor_a:
-        for row in cursor_a:
-            row[0] = int(FIPS)
-            cursor_a.updateRow(row)
+        ## Fill FIPS field with UTM info
+        #arcpy.CalculateField_management(in_table = input_feature, field = "FIPS", \
+        #                                expression = FIPS, \
+        #                                expression_type = "PYTHON_9.3", )
+        #                                #code_block = 'def fn(num):\n  if num <= %s:\n    return (1)\n  elif num > %s:\n    return (2)' %(collectEvents, collectEvents))
 
-    ## Add a second field to store FIPS information. This field will hold the
-    ##  FIPS as a string and will NOT remove leading zeroes
-    arcpy.AddField_management(in_table = input_feature, field_name = "FIPS2", \
-                              field_type = "TEXT", field_precision = "", \
-                              field_scale = "", field_length = "", field_alias = "", \
-                              field_is_nullable = "NULLABLE", \
-                              field_is_required = "NON_REQUIRED", field_domain = "")
+        ## Fill newly created UTM field with the proper UTM
+        with arcpy.da.UpdateCursor(input_feature, ['FIPS']) as cursor_a:
+            for row in cursor_a:
+                row[0] = int(FIPS)
+                cursor_a.updateRow(row)
 
-    ## Fill FIPS field with UTM info
-    #arcpy.CalculateField_management(in_table = input_feature, field = "FIPS2", \
-     #                               expression = FIPS, \
-      #                              expression_type = "PYTHON_9.3", )
-       #                             #code_block = 'def fn(num):\n  if num <= %s:\n    return (1)\n  elif num > %s:\n    return (2)' %(collectEvents, collectEvents))
+        ## Add a second field to store FIPS information. This field will hold the
+        ##  FIPS as a string and will NOT remove leading zeroes
+        arcpy.AddField_management(in_table = input_feature, field_name = "FIPS2", \
+                                  field_type = "TEXT", field_precision = "", \
+                                  field_scale = "", field_length = "", field_alias = "", \
+                                  field_is_nullable = "NULLABLE", \
+                                  field_is_required = "NON_REQUIRED", field_domain = "")
 
-    ## Fill newly created UTM field with the proper UTM
-    with arcpy.da.UpdateCursor(input_feature, ['FIPS2']) as cursor_b:
-        for row in cursor_b:
-            row[0] = str(FIPS)
-            cursor_b.updateRow(row)
+        ## Fill FIPS field with UTM info
+        #arcpy.CalculateField_management(in_table = input_feature, field = "FIPS2", \
+         #                               expression = FIPS, \
+          #                              expression_type = "PYTHON_9.3", )
+           #                             #code_block = 'def fn(num):\n  if num <= %s:\n    return (1)\n  elif num > %s:\n    return (2)' %(collectEvents, collectEvents))
+
+        ## Fill newly created UTM field with the proper UTM
+        with arcpy.da.UpdateCursor(input_feature, ['FIPS2']) as cursor_b:
+            for row in cursor_b:
+                row[0] = str(FIPS)
+                cursor_b.updateRow(row)
 
 def clip(input_feature, clip_files, output_location, state_abbrev, county_name):
 
@@ -343,29 +351,29 @@ def deleteIntermediates(intermed_list):
             print "error deleting the following file:\n" + intermed_file
 
 ###########TESTING ---- REMOVE THIS LATER############
-county_name = 'Barbour'
-state_abbrev = 'AL'
-state_name = nameFormat(state_abbrev_to_name[state_abbrev])
-cluster = 1
-county_outline = os.path.join(county_outline_folder,
-                                  state_name + '.gdb',
-                                  county_name + 'Co' + state_abbrev + '_outline')
-FIPS, UTM = FIPS_UTM(county_outline)
-batchGDB = 'BatchGDB_' + state_abbrev + '_Z' + str(UTM) + '_c' + str(cluster) + '.gdb'
-batchGDB = os.path.join(output_folder, state_name, batchGDB)
-batchFile = 'Batch' + '_' + state_abbrev + '_' + county_name
-batchLocation = os.path.join(batchGDB, batchFile)
-errors = []
-intermed_list = []
+def testing():
+    county_name = 'Barbour'
+    state_abbrev = 'AL'
+    state_name = nameFormat(state_abbrev_to_name[state_abbrev])
+    cluster = 1
+    county_outline = os.path.join(county_outline_folder,
+                                      state_name + '.gdb',
+                                      county_name + 'Co' + state_abbrev + '_outline')
+    FIPS, UTM = FIPS_UTM(county_outline)
+    batchGDB = 'BatchGDB_' + state_abbrev + '_Z' + str(UTM) + '_c' + str(cluster) + '.gdb'
+    batchGDB = os.path.join(output_folder, state_name, batchGDB)
+    batchFile = 'Batch' + '_' + state_abbrev + '_' + county_name
+    batchLocation = os.path.join(batchGDB, batchFile)
+    errors = []
+    intermed_list = []
     
 if __name__ == '__main__':
 
     errors = []
 
-    #for county in countyList:
     for county in countyList:
 
-        intermed_list
+
         intermed_list = []  # this will be filled later with the FilePaths to all the intermediate
                             #  files, which may or may not be deleted depending on whether
                             #  save_intermediates is True or False

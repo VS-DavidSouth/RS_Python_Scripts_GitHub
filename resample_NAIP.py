@@ -19,26 +19,25 @@ start_time = time.time()
 
 import arcpy, os, sys
 
-# this next line gives us access to the nameFormat function
 sys.path.insert(0, r'O:\AI Modeling Coop Agreement 2017\David_working\Python') 
 from Converting_state_names_and_abreviations import *
     ## The above lines give us acccess to 3 useful things:
-    ##      nameFormat(x)
-    ##      state_abbrev_to_name[x]
-    ##      state_name_to_abbrev[x]
+    ##      nameFormat(x) - a function that removes . and , and replaces - and [space] with _
+    ##      state_abbrev_to_name[x] - a dictionary that converts state abbreviations to names
+    ##      state_name_to_abbrev[x] - a dictionary that converts state names to 2-letter abbreviations
 
 ############################
 ####### PARAMETERS #########
 ############################
 
 states2do = [
-    'Illinois',       
-    'Michigan',          
-    'New York',
-    'Oregon',
-    'South Dakota',
-    'Washington',
-    'West Virginia',
+    'Alabama',       
+    'Arkansas',          
+    'North Carolina',
+    'Georgia',
+    'Mississippi',
+    'Tennessee',
+    'Louisiana',
     ]
 
 NAIP_folder = r'R:\Nat_Hybrid_Poultry\Imagery\NAIP'
