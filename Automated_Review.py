@@ -98,13 +98,24 @@ countyList = []
 for county in first10counties:
     countyList.append([county, 'AL'])
 
-## location of probability surface raster
+## Location of probability surface raster
 probSurfaceRaster = r'N:\FLAPS from Chris Burdett\Data\poultry_prob_surface\poultryMskNrm\poultryMskNrm.tif'
 
 county_outline_folder = r'N:\Remote Sensing Projects\2016 Cooperative Agreement Poultry Barns\Documents\Deliverables\Library\CountyOutlines'
 
 output_folder = r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst'
 
+## Define the maximum and minimum Length(L) or AspRatio(AR) values
+##  (which came from the Batch file). Any points outisde of these bounds
+##  are deleted automatically. L values are in meters.
+L_max_threshold = 800   # Fill this with 99999 if you don't want to delete based on max Length
+L_min_threshold = 35    # Fill this with 0 if you don't want to delete based on min Length
+AR_max_threshold = 10   # Fill this with 99999 if you don't want to delete based on max AspRatio
+AR_min_threshold = 1.3  # Fill this with 0 if you don't want to delete based on min AspRatio
+thresholds = [
+              [L_max_threshold, L_min_threshold],   ## This section just makes it so that we don't need
+              [AR_max_threshold, AR_min_threshold], ##  so many input parameters for the LAR function
+             ]
 ############################
 #### DEFINE FUNCTIONS #####
 ############################
@@ -123,10 +134,13 @@ def checkTime():
     else:
         return str(round( timeSoFar / 60. , 1)) + " hours"
 
+
 def FIPS_UTM(county_file):
+
     with arcpy.da.SearchCursor(county_file, ['FIPS', 'UTM',]) as cursor:
         for row in cursor:
             return cursor[0], cursor[1]
+
 
 def add_FIPS_info(input_feature, state_abbrev, county_name):
     
@@ -154,7 +168,7 @@ def add_FIPS_info(input_feature, state_abbrev, county_name):
                                   field_is_nullable = "NULLABLE", \
                                   field_is_required = "NON_REQUIRED", field_domain = "")
 
-        ## Fill FIPS field with UTM info
+        ## Fill FIPS field with UTM info (DOES NOT FUNCTION PROPERLY)
         #arcpy.CalculateField_management(in_table = input_feature, field = "FIPS", \
         #                                expression = FIPS, \
         #                                expression_type = "PYTHON_9.3", )
@@ -186,6 +200,7 @@ def add_FIPS_info(input_feature, state_abbrev, county_name):
                 row[0] = str(FIPS)
                 cursor_b.updateRow(row)
 
+
 def clip(input_feature, clip_files, output_location, state_abbrev, county_name):
 
     ## Get rid of any weird characters in the county name
@@ -207,31 +222,51 @@ def clip(input_feature, clip_files, output_location, state_abbrev, county_name):
     intermed_list.append(input_feature)
 
     return outputFilePath
+
     
-def LAR(input_feature, L_threshold, AR_threshold, state_abbrev, county_name):
+def LAR(input_feature, thresholds, output_location, state_abbrev, county_name):
     ##
-    ## LAR stands for Length(L) and Aspect Ratio(AR)
+    ## LAR stands for Length(L) and Aspect Ratio(AR). This function
+    ##  deletes points that do not conform with L or AR thresholds.
     ##
 
-    county_name = nameFormat(county_name)
+    L_max_threshold =  thresholds [0][0]
+    L_min_threshold =  thresholds [0][1]
+    AR_max_threshold = thresholds [1][0]
+    AR_min_threshold = thresholds [1][1]
+
+    #outputName = 'LAR' + '_' + state_abbrev + '_' + county_name
+    outputName = 'LAR' + '_' + state_abbrev + '_' + county_name + '_LAR' # DELETE THIS WHEN NO LONGER TESTING LENGTH
+    outputFilePath = os.path.join(output_location, outputName)
+
+    arcpy.CopyFeatures_management (input_feature, outputFilePath)
 
     ## Add the AspRatio field
-    arcpy.AddField_management(in_table = input_feature, \
-                              field_name = "AspRatio", field_type = "SHORT", \
+    arcpy.AddField_management(in_table = outputFilePath, \
+                              field_name = "AspRatio", field_type = "FLOAT", \
                               field_precision = "", field_scale = "", field_length = "", \
                               field_alias = "", field_is_nullable = "NULLABLE", \
                               field_is_required = "NON_REQUIRED", field_domain = "")
 
     ## Fill the AspRatio field that was just created
-    arcpy.CalculateField_management(in_table = input_feature, \
+    arcpy.CalculateField_management(in_table = outputFilePath, \
                                     field = "AspRatio", \
-                                    expression = "[Length]/[Width]", \
-                                    expression_type = "VB", code_block = "")
+                                    expression = "!Length!/!Width!", \
+                                    expression_type = "PYTHON_9.3", code_block = "")
 
     ## Delete features based on the Length and AspRatio fields
+    with arcpy.da.UpdateCursor(outputFilePath, ["Length", "AspRatio",]) as deleteCursor:
+        for row in deleteCursor:
+            if row[0] > L_max_threshold or row[0] < L_min_threshold:
+                deleteCursor.deleteRow()
+            elif row[1] > AR_max_threshold or row[1] < AR_min_threshold:
+                deleteCursor.deleteRow()
 
     ## Add the old file to the list of intermediate files
     intermed_list.append(input_feature)
+
+    return outputFilePath
+
     
 def masking(variable1, variable2, state_abbrev, county_name):
     
@@ -249,7 +284,8 @@ def probSurface(input_point_data, raster_dataset, output_location, state_abbrev,
 
     threshold = 0.15
 
-    outputName = 'ProbSurf_' + state_abbrev + '_' + county_name
+    #outputName = 'ProbSurf_' + state_abbrev + '_' + county_name
+    outputName = 'ProbSurf_' + state_abbrev + '_' + county_name + '_LAR' # DELETE THIS WHEN NO LONGER TESTING LENGTH
     outputFilePath = os.path.join(output_location, outputName)
 
     arcpy.CopyFeatures_management (input_point_data, outputFilePath)
@@ -267,6 +303,7 @@ def probSurface(input_point_data, raster_dataset, output_location, state_abbrev,
     intermed_list.append(input_point_data)
 
     return outputFilePath
+
         
 def collapsePoints(input_point_data, output_location, state_abbrev, county_name):
     ##
@@ -277,10 +314,13 @@ def collapsePoints(input_point_data, output_location, state_abbrev, county_name)
     county_name = nameFormat(county_name)
     state_name = nameFormat(state_abbrev_to_name[state_abbrev])
 
-    ## Set up names and FilePaths for the Ingetrate and CollectEvents files 
-    integrateOutputName = 'Integrate_' + state_abbrev + '_' + county_name
+    ## Set up names and FilePaths for the Ingetrate and CollectEvents files
+    #integrateOutputName = 'Integrate_' + state_abbrev + '_' + county_name
+    integrateOutputName = 'Integrate_' + state_abbrev + '_' + county_name + '_LAR' # DELETE THIS WHEN NO LONGER TESTING LENGTH
+
     integrateOutputFilePath = os.path.join(output_location, integrateOutputName)
-    collectEventsOutputName = 'CollectEvents' + '_' + state_abbrev + '_' + county_name
+    #collectEventsOutputName = 'CollectEvents' + '_' + state_abbrev + '_' + county_name
+    collectEventsOutputName = 'CollectEvents' + '_' + state_abbrev + '_' + county_name + '_LAR' # DELETE THIS WHEN NO LONGER TESTING LENGTH
     collectEventsOutputFilePath = os.path.join(output_location, collectEventsOutputName)
 
     if arcpy.Exists(integrateOutputFilePath):
@@ -291,19 +331,18 @@ def collapsePoints(input_point_data, output_location, state_abbrev, county_name)
     ## The input file path to the Integrate tool NEEDS to have no spaces in it, otherwise it will cause errors
     arcpy.Integrate_management(in_features = integrateOutputFilePath, cluster_tolerance = "100 Meters")
 
-
-    
     ## Collapse points that are on top of eachother to single points
     arcpy.CollectEvents_stats(Input_Incident_Features = integrateOutputFilePath, \
                               Output_Weighted_Point_Feature_Class = collectEventsOutputFilePath)
 
-    add_FIPS_info(collectEventsOutputFilePath)
+    add_FIPS_info(collectEventsOutputFilePath, state_abbrev, county_name)
 
     ## Add the old file to the list of intermediate files
     intermed_list.append(input_point_data)
     intermed_list.append(integrateOutputFilePath)
 
     return collectEventsOutputFilePath
+
 
 def project(input_data, output_location, state_abbrev, county_name, UTM_code):
     ##
@@ -312,12 +351,14 @@ def project(input_data, output_location, state_abbrev, county_name, UTM_code):
     ##
 
     county_name = nameFormat(county_name)
-    
-    outputName = 'AutoReview_' + state_abbrev + '_' + county_name
+
+    #outputName = 'AutoReview_' + state_abbrev + '_' + county_name
+    outputName = 'AutoReview_' + state_abbrev + '_' + county_name + '_LAR' # DELETE THIS WHEN NO LONGER TESTING LENGTH
+
     outputFilePath = os.path.join(output_location, outputName)
 
-    meridian = centralMeridian[int(UTM_code)]    ## centralMeridian is a dictionary found in Setting_up_counties_database.py
-                                            ##  and specifies the central meridian for the projection
+    meridian = centralMeridian[int(UTM_code)] ## centralMeridian is a dictionary found in Setting_up_counties_database.py
+                                              ##  and specifies the central meridian for the projection
     
     ## Project file into WGS 1984 Geographic Coordinate System
     arcpy.Project_management(in_dataset = input_data, \
@@ -336,6 +377,7 @@ def project(input_data, output_location, state_abbrev, county_name, UTM_code):
 
     return outputFilePath
 
+
 def deleteIntermediates(intermed_list):
     ##
     ## This function is designed to be used in the other functions
@@ -350,8 +392,10 @@ def deleteIntermediates(intermed_list):
         except:
             print "error deleting the following file:\n" + intermed_file
 
+
 ###########TESTING ---- REMOVE THIS LATER############
 def testing():
+    global county_name, state_abbrev, state_name, cluster, county_outline, FIPS, UTM, batchGDB, batchFile, batchLocation, errors, intermed_list
     county_name = 'Barbour'
     state_abbrev = 'AL'
     state_name = nameFormat(state_abbrev_to_name[state_abbrev])
@@ -360,7 +404,8 @@ def testing():
                                       state_name + '.gdb',
                                       county_name + 'Co' + state_abbrev + '_outline')
     FIPS, UTM = FIPS_UTM(county_outline)
-    batchGDB = 'BatchGDB_' + state_abbrev + '_Z' + str(UTM) + '_c' + str(cluster) + '.gdb'
+    #batchGDB = 'BatchGDB_' + state_abbrev + '_Z' + str(UTM) + '_c' + str(cluster) + '.gdb'
+    batchGDB = 'BatchGDB_' + state_abbrev + '_Z' + str(UTM) + '_c' + str(cluster) + '_test' + '.gdb' # DELETE THIS WHEN NO LONGER TESTING LENGTH
     batchGDB = os.path.join(output_folder, state_name, batchGDB)
     batchFile = 'Batch' + '_' + state_abbrev + '_' + county_name
     batchLocation = os.path.join(batchGDB, batchFile)
@@ -373,6 +418,8 @@ if __name__ == '__main__':
 
     for county in countyList:
 
+        ## Reset the file parameters, so that if there are errors they are not used again
+        clipFile = larFile = maskFile = collapsePointsFile = autoReviewFile = ''
 
         intermed_list = []  # this will be filled later with the FilePaths to all the intermediate
                             #  files, which may or may not be deleted depending on whether
@@ -387,8 +434,10 @@ if __name__ == '__main__':
                                       county_name + 'Co' + state_abbrev + '_outline')
         FIPS, UTM = FIPS_UTM(county_outline)
                 
-        batchGDB = 'BatchGDB_' + state_abbrev + '_Z' + str(UTM) + '_c' + str(cluster) + '.gdb'
-        batchGDB = os.path.join(output_folder, state_name, batchGDB)
+        #batchGDBname = 'BatchGDB_' + state_abbrev + '_Z' + str(UTM) + '_c' + str(cluster) + '.gdb'
+        batchGDBname = 'BatchGDB_' + state_abbrev + '_Z' + str(UTM) + '_c' + str(cluster) + '_test' + '.gdb' # DELETE THIS WHEN NO LONGER TESTING LENGTH
+        batchGDB = os.path.join(output_folder, state_name, batchGDBname)
+    
         batchFile = 'Batch' + '_' + state_abbrev + '_' + county_name
         batchLocation = os.path.join(batchGDB, batchFile)
 
@@ -397,39 +446,57 @@ if __name__ == '__main__':
             clipFile = clip(batchLocation, county_outline, batchGDB, state_abbrev, county_name)
             print "Clipped. Script duration so far:", checkTime()
         except:
-            errors.append(['Clip', state_abbrev, county_name])
-                          
-        #LAR(input_feature, L_threshold, AR_threshold)
-        
+            e = sys.exc_info()[1]
+            print(e.args[0])
+            errors.append(['Clip', state_abbrev, county_name, e.args[0] ])
+
+        print "Applying Length/AspRatio thresholds for", state_name, county_name + "..."              
+        try:
+            larFile = LAR(clipFile, thresholds, batchGDB, state_abbrev, county_name)
+            print "LAR thresholds applied. Script duration so far:", checkTime()
+        except:
+            e = sys.exc_info()[1]
+            print(e.args[0])
+            errors.append(['LAR', state_abbrev, county_name, e.args[0] ])
+            
         #masking()
 
         print "Applying probability surface for", state_name, county_name
         try:
-            probSurfaceFile = probSurface(clipFile, probSurfaceRaster, batchGDB, state_abbrev, county_name)
+            probSurfaceFile = probSurface(larFile, probSurfaceRaster, batchGDB, state_abbrev, county_name)
             print "Probability surface applied. Script duration so far:", checkTime()
         except:
-            errors.append(['ProbSurf', state_abbrev, county_name])
+            e = sys.exc_info()[1]
+            print(e.args[0])
+            errors.append(['ProbSurf', state_abbrev, county_name, e.args[0] ])
 
         print "Collapsing points for", state_name, county_name
         try:
             collapsePointsFile = collapsePoints(probSurfaceFile, batchGDB, state_abbrev, county_name)
             print "Points collapsed. Script duration so far:", checkTime()
         except:
-            errors.append(['Integrate or CollectEvents', state_abbrev, county_name])
+            e = sys.exc_info()[1]
+            print(e.args[0])
+            errors.append(['Integrate or CollectEvents', state_abbrev, county_name, e.args[0] ])
                           
         print "Projecting Automated Review for", state_name, county_name
         try:
-            automatedReviewFile = project(collapsePointsFile, batchGDB, state_abbrev, county_name, UTM)
+            autoReviewFile = project(collapsePointsFile, batchGDB, state_abbrev, county_name, UTM)
             print "Projected. Script duration so far:", checkTime()
         except:
-            errors.append(['AutoReview', state_abbrev, county_name])
+            e = sys.exc_info()[1]
+            print(e.args[0])
+            errors.append(['AutoReview', state_abbrev, county_name, e.args[0] ])
             
         if save_intermediates == False:
             deleteIntermediates(intermed_list)
 
-    print "The following counties had errors:"
-    for row in errors:
-        print row[0], row[1], row[2]
+    if errors == []:
+        print "\n\nNo counties had any errors!"
+    else:
+        print "\n\nThe following counties had errors:"
+        for row in errors:
+            print row[0], row[1], row[2]
 
     ############################
     ######### CLEANUP ##########
