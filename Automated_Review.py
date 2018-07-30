@@ -19,6 +19,7 @@
 ##  http://desktop.arcgis.com/en/arcmap/10.3/analyze/creating-tools/adding-a-script-tool.htm
 ##
 
+
 ############################
 ########## SETUP ###########
 ############################
@@ -39,6 +40,46 @@ sys.path.insert(0, r'O:\AI Modeling Coop Agreement 2017\David_working\Python') #
 from Converting_state_names_and_abreviations import *
 
 
+############################
+######## PARAMETERS ########
+############################
+
+runScriptAsTool = True # This will overwrite any preset parameters by the ArcGIS tool inputs
+
+saveIntermediates = True   # Change to false if you don't care about the intermediate files
+
+clusterList = [] # A list of the file paths to all the relevant cluster GDBs. You can manually
+                 #  input entries if runScriptAsTool = False
+
+## Location of probability surface raster
+probSurfaceRaster = r'N:\FLAPS from Chris Burdett\Data\poultry_prob_surface\poultryMskNrm\poultryMskNrm.tif'
+
+county_outline_folder = r'N:\Remote Sensing Projects\2016 Cooperative Agreement Poultry Barns\Documents\Deliverables\Library\CountyOutlines'
+
+output_folder = r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst'
+
+## Define the maximum and minimum Length(L) or AspRatio(AR) values
+##  (which came from the Batch file). Any points outisde of these bounds
+##  are deleted automatically. L values are in meters.
+L_max_threshold = 800   # Fill this with 99999 if you don't want to delete based on max Length
+L_min_threshold = 35    # Fill this with 0 if you don't want to delete based on min Length
+AR_max_threshold = 10   # Fill this with 99999 if you don't want to delete based on max AspRatio
+AR_min_threshold = 1.3  # Fill this with 0 if you don't want to delete based on min AspRatio
+thresholds = [
+              [L_max_threshold, L_min_threshold],   ## This section just makes it so that we don't need
+              [AR_max_threshold, AR_min_threshold], ##  so many input parameters for the LAR function
+             ]
+
+## Overwrite certain parameters set above, if this tool is run as a custom
+##  ArcGIS Python tool. The values will be determined by the user.
+if runScriptAsTool == True:
+    clusterList = arcpy.GetParametersAsText(0)   # This should be in list format, but can contain a single entry
+    L_max_threshold = arcpy.GetParametersAsText(1)  # Set default to 800
+    L_min_threshold = arcpy.GetParametersAsText(2)  # Set default to 35
+    AR_max_threshold = arcpy.GetParametersAsText(3) # Set defualt to 10
+    AR_min_threshold = arcpy.GetParametersAsText(4) # Set default to 1.3
+    saveIntermediates = arcpy.GetparametersAsText(5)# Set default to True
+    
 ############################
 #### NAMING CONVENTIONS ####
 ############################
@@ -66,56 +107,15 @@ prefix_dict = {
     'BatchGDB': 'A file geodatabase that contains all the intermediate files for the creation of the Batch file',
     'BatchMXD': 'The ArcMap MXD file that was used to run Feature Analyst to create the Batch file',
     'Clip': 'Intermediate stage after creating Batch file, this is the Batch file clipped to the county',
-    'LAR': 'TO BE DETERMINED',
-    'Masked': 'TO BE DETERMINED',
-    'ProbSurf': 'TO BE DETERMINED',
-    'Integrate': 'TO BE DETERMINED',
-    'CollectEvents': 'TO BE DETERMINED',
-    'AutoReview': 'TO BE DETERMINED',
+    'LAR': 'The Clip file but with points with Length or AspRatio values outside of the thresholds removed',
+    'Mask': 'The LAR file but with points removed based on masking layers',
+    'ProbSurf': 'The Mask file but with values from the probability surface used to remove FPs',
+    'Integrate': 'The ProbSurf file but points within 100m of each other are moved on top of one another at the centroid',
+    'CollectEvents': 'Integrate file but with points on top of one another combined to a single point',
+    'AutoReview': 'The final stage, which is the CollectEvents file but projected into NAD 1983',
     }
 
 
-############################
-######## PARAMETERS ########
-############################
-
-save_intermediates = True   # change to false if you don't care about the intermediate files
-
-                   
-first10counties = [     ## This list holds the first 10 counties in Alabama
-    'Barbour',          ##  alphabetically. We are running these first to 
-    'Blount',           ##  get a full batch complete.
-    'Bullock',
-    'Butler',
-    'Calhoun',
-    'Cherokee',
-    'Clay',
-    'Cleburne',
-    'Coffee',
-    'Colbert',
-    ]
-countyList = []
-for county in first10counties:
-    countyList.append([county, 'AL'])
-
-## Location of probability surface raster
-probSurfaceRaster = r'N:\FLAPS from Chris Burdett\Data\poultry_prob_surface\poultryMskNrm\poultryMskNrm.tif'
-
-county_outline_folder = r'N:\Remote Sensing Projects\2016 Cooperative Agreement Poultry Barns\Documents\Deliverables\Library\CountyOutlines'
-
-output_folder = r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst'
-
-## Define the maximum and minimum Length(L) or AspRatio(AR) values
-##  (which came from the Batch file). Any points outisde of these bounds
-##  are deleted automatically. L values are in meters.
-L_max_threshold = 800   # Fill this with 99999 if you don't want to delete based on max Length
-L_min_threshold = 35    # Fill this with 0 if you don't want to delete based on min Length
-AR_max_threshold = 10   # Fill this with 99999 if you don't want to delete based on max AspRatio
-AR_min_threshold = 1.3  # Fill this with 0 if you don't want to delete based on min AspRatio
-thresholds = [
-              [L_max_threshold, L_min_threshold],   ## This section just makes it so that we don't need
-              [AR_max_threshold, AR_min_threshold], ##  so many input parameters for the LAR function
-             ]
 ############################
 #### DEFINE FUNCTIONS #####
 ############################
@@ -135,14 +135,41 @@ def checkTime():
         return str(round( timeSoFar / 60. , 1)) + " hours"
 
 
-def FIPS_UTM(county_file):
+def findBatch(clusterGDB):
+    ##
+    ## This function finds all the point files in the target GDB
+    ##  and returns them in the form of a list.
+    ##
+    walkList = []   ## This will hold all of the file paths to the files wuithin the folder
 
+    walk = arcpy.da.Walk(clusterGDB, datatype = "Point")
+
+    for dirpath, dirnames, filenames in walk:
+        for filename in filenames:
+            if filename[:6] = 'Batch_':
+                county_name = filename[9:]
+                path = os.path.join(dirpath, filename)
+                walkList.append([county_name, path])
+
+    ## Look at the first path in walkList and get the state_abbrev from that
+    state_abbrev = os.path.basename(walkList[0][1]) [6:8]
+    
+    return state_abbrev, walkList
+
+
+def FIPS_UTM(county_file):
+    ##
+    ## This determines the appropriate UTM and FIPS code values for the county.
+    ##
     with arcpy.da.SearchCursor(county_file, ['FIPS', 'UTM',]) as cursor:
         for row in cursor:
             return cursor[0], cursor[1]
 
 
 def add_FIPS_info(input_feature, state_abbrev, county_name):
+    ##
+    ## This adds the FIPS value (from the FIPS_UTM function) to a given shapefile
+    ##
     
     ## The following several lines are to check to see if the FIPS or FIPS2 fields exist
     fieldList = [field.name for field in arcpy.ListFields(input_feature)] # Creates a list of all fields in that feature class
@@ -202,7 +229,11 @@ def add_FIPS_info(input_feature, state_abbrev, county_name):
 
 
 def clip(input_feature, clip_files, output_location, state_abbrev, county_name):
-
+    ##
+    ## This function clips the input features and names everything properly,
+    ##  as well as adding FIPS information.
+    ##
+    
     ## Get rid of any weird characters in the county name
     county_name = nameFormat(county_name)
     
@@ -307,8 +338,11 @@ def probSurface(input_point_data, raster_dataset, output_location, state_abbrev,
         
 def collapsePoints(input_point_data, output_location, state_abbrev, county_name):
     ##
-    ## Note: This function changes the input data with the Integrate tool.
-    ##  input_point_data MUST HAVE NO SPACES OR SPECIAL CHARACTERS IN IT!
+    ## This function creates a new file and uses the Integrate and CollectEvents
+    ##  ArcGIS tools to collapse input points within 100m of each other to
+    ##  single points. Note: The Integrate tool is really finiky about the
+    ##  file paths having spaces in them. It will cause vague errors if there
+    ##  are spaces or special characters in the filepaths. Don't do it.
     ##
 
     county_name = nameFormat(county_name)
@@ -347,7 +381,7 @@ def collapsePoints(input_point_data, output_location, state_abbrev, county_name)
 def project(input_data, output_location, state_abbrev, county_name, UTM_code):
     ##
     ## This function projects the input from the UTM county projection into
-    ##  WGS 1984 Geographic Coordinate System
+    ##  WGS 1984 Geographic Coordinate System.
     ##
 
     county_name = nameFormat(county_name)
@@ -393,116 +427,116 @@ def deleteIntermediates(intermed_list):
             print "error deleting the following file:\n" + intermed_file
 
 
-###########TESTING ---- REMOVE THIS LATER############
-def testing():
-    global county_name, state_abbrev, state_name, cluster, county_outline, FIPS, UTM, batchGDB, batchFile, batchLocation, errors, intermed_list
-    county_name = 'Barbour'
-    state_abbrev = 'AL'
-    state_name = nameFormat(state_abbrev_to_name[state_abbrev])
-    cluster = 1
-    county_outline = os.path.join(county_outline_folder,
-                                      state_name + '.gdb',
-                                      county_name + 'Co' + state_abbrev + '_outline')
-    FIPS, UTM = FIPS_UTM(county_outline)
-    #batchGDB = 'BatchGDB_' + state_abbrev + '_Z' + str(UTM) + '_c' + str(cluster) + '.gdb'
-    batchGDB = 'BatchGDB_' + state_abbrev + '_Z' + str(UTM) + '_c' + str(cluster) + '_test' + '.gdb' # DELETE THIS WHEN NO LONGER TESTING LENGTH
-    batchGDB = os.path.join(output_folder, state_name, batchGDB)
-    batchFile = 'Batch' + '_' + state_abbrev + '_' + county_name
-    batchLocation = os.path.join(batchGDB, batchFile)
-    errors = []
-    intermed_list = []
-    
+############################
+######### DO STUFF #########
+############################
+
 if __name__ == '__main__':
 
     errors = []
 
-    for county in countyList:
-
-        ## Reset the file parameters, so that if there are errors they are not used again
-        clipFile = larFile = maskFile = collapsePointsFile = autoReviewFile = ''
-
-        intermed_list = []  # this will be filled later with the FilePaths to all the intermediate
-                            #  files, which may or may not be deleted depending on whether
-                            #  save_intermediates is True or False
-
-        county_name = county[0]
-        state_abbrev = county[1]
+    for clusterGDB in clusterList:
+        
+        state_abbrev, batchList = findBatch(cluster)
         state_name = nameFormat(state_abbrev_to_name[state_abbrev])
-        cluster = 1 ##CHANGE THIS LATER
-        county_outline = os.path.join(county_outline_folder,
-                                      state_name + '.gdb',
-                                      county_name + 'Co' + state_abbrev + '_outline')
-        FIPS, UTM = FIPS_UTM(county_outline)
+
+        for countyBatch in batchList:
+
+            ## Reset the file parameters, so that if there are errors they are not used again
+            clipFile = larFile = maskFile = collapsePointsFile = autoReviewFile = ''
+
+            intermed_list = []  # this will be filled later with the FilePaths to all the intermediate
+                                #  files, which may or may not be deleted depending on whether
+                                #  saveIntermediates is True or False
+
+            county_name = countyBatch[0]
+            county_outline = os.path.join(county_outline_folder,
+                                          state_name + '.gdb',
+                                          county_name + 'Co' + state_abbrev + '_outline')
+            FIPS, UTM = FIPS_UTM(county_outline)
+
+            batchLocation = countyBatch[1]
+
+            #          #
+            # CLIPPING #
+            #          #
+            print "Clipping", state_name, county_name + "..."
+            try:
+                clipFile = clip(batchLocation, county_outline, clusterGDB, state_abbrev, county_name)
+                print "Clipped. Script duration so far:", checkTime()
+            except:
+                e = sys.exc_info()[1]
+                print(e.args[0])
+                errors.append(['Clip', state_abbrev, county_name, e.args[0] ])
+
+            #          #
+            #   LAR    #
+            #          # 
+            print "Applying Length/AspRatio thresholds for", state_name, county_name + "..."              
+            try:
+                larFile = LAR(clipFile, thresholds, batchGDB, state_abbrev, county_name)
+                print "LAR thresholds applied. Script duration so far:", checkTime()
+            except:
+                e = sys.exc_info()[1]
+                print(e.args[0])
+                errors.append(['LAR', state_abbrev, county_name, e.args[0] ])
                 
-        #batchGDBname = 'BatchGDB_' + state_abbrev + '_Z' + str(UTM) + '_c' + str(cluster) + '.gdb'
-        batchGDBname = 'BatchGDB_' + state_abbrev + '_Z' + str(UTM) + '_c' + str(cluster) + '_test' + '.gdb' # DELETE THIS WHEN NO LONGER TESTING LENGTH
-        batchGDB = os.path.join(output_folder, state_name, batchGDBname)
-    
-        batchFile = 'Batch' + '_' + state_abbrev + '_' + county_name
-        batchLocation = os.path.join(batchGDB, batchFile)
+            #          #
+            #  MASKING #
+            #          #  
+            #PLACEHOLDER
 
-        print "Clipping", state_name, county_name + "..."
-        try:
-            clipFile = clip(batchLocation, county_outline, batchGDB, state_abbrev, county_name)
-            print "Clipped. Script duration so far:", checkTime()
-        except:
-            e = sys.exc_info()[1]
-            print(e.args[0])
-            errors.append(['Clip', state_abbrev, county_name, e.args[0] ])
+            #           #
+            #PROBSURFACE#
+            #           # 
+            print "Applying probability surface for", state_name, county_name
+            try:
+                probSurfaceFile = probSurface(larFile, probSurfaceRaster, batchGDB, state_abbrev, county_name)
+                print "Probability surface applied. Script duration so far:", checkTime()
+            except:
+                e = sys.exc_info()[1]
+                print(e.args[0])
+                errors.append(['ProbSurf', state_abbrev, county_name, e.args[0] ])
 
-        print "Applying Length/AspRatio thresholds for", state_name, county_name + "..."              
-        try:
-            larFile = LAR(clipFile, thresholds, batchGDB, state_abbrev, county_name)
-            print "LAR thresholds applied. Script duration so far:", checkTime()
-        except:
-            e = sys.exc_info()[1]
-            print(e.args[0])
-            errors.append(['LAR', state_abbrev, county_name, e.args[0] ])
-            
-        #masking()
+            #          #
+            #   C2P    #
+            #          # 
+            print "Collapsing points for", state_name, county_name
+            try:
+                collapsePointsFile = collapsePoints(probSurfaceFile, batchGDB, state_abbrev, county_name)
+                print "Points collapsed. Script duration so far:", checkTime()
+            except:
+                e = sys.exc_info()[1]
+                print(e.args[0])
+                errors.append(['Integrate or CollectEvents', state_abbrev, county_name, e.args[0] ])
 
-        print "Applying probability surface for", state_name, county_name
-        try:
-            probSurfaceFile = probSurface(larFile, probSurfaceRaster, batchGDB, state_abbrev, county_name)
-            print "Probability surface applied. Script duration so far:", checkTime()
-        except:
-            e = sys.exc_info()[1]
-            print(e.args[0])
-            errors.append(['ProbSurf', state_abbrev, county_name, e.args[0] ])
+            #          #
+            #PROJECTING#
+            #          #                               
+            print "Projecting Automated Review for", state_name, county_name
+            try:
+                autoReviewFile = project(collapsePointsFile, batchGDB, state_abbrev, county_name, UTM)
+                print "Projected. Script duration so far:", checkTime()
+            except:
+                e = sys.exc_info()[1]
+                print(e.args[0])
+                errors.append(['AutoReview', state_abbrev, county_name, e.args[0] ])
+                
+            if saveIntermediates == False:
+                deleteIntermediates(intermed_list)
 
-        print "Collapsing points for", state_name, county_name
-        try:
-            collapsePointsFile = collapsePoints(probSurfaceFile, batchGDB, state_abbrev, county_name)
-            print "Points collapsed. Script duration so far:", checkTime()
-        except:
-            e = sys.exc_info()[1]
-            print(e.args[0])
-            errors.append(['Integrate or CollectEvents', state_abbrev, county_name, e.args[0] ])
-                          
-        print "Projecting Automated Review for", state_name, county_name
-        try:
-            autoReviewFile = project(collapsePointsFile, batchGDB, state_abbrev, county_name, UTM)
-            print "Projected. Script duration so far:", checkTime()
-        except:
-            e = sys.exc_info()[1]
-            print(e.args[0])
-            errors.append(['AutoReview', state_abbrev, county_name, e.args[0] ])
-            
-        if save_intermediates == False:
-            deleteIntermediates(intermed_list)
+        if errors == []:
+            print "\n\nNo counties had any errors!"
+        else:
+            print "\n\nThe following counties had errors:"
+            for row in errors:
+                print row[0], row[1], row[2]
 
-    if errors == []:
-        print "\n\nNo counties had any errors!"
-    else:
-        print "\n\nThe following counties had errors:"
-        for row in errors:
-            print row[0], row[1], row[2]
-
-    ############################
-    ######### CLEANUP ##########
-    ############################
-    
-    print "---------------------\nSCRIPT COMPLETE!"
-    print "The script took a total of", checkTime() + "."
-    print "---------------------"
+        ############################
+        ######### CLEANUP ##########
+        ############################
+        
+        print "---------------------\nSCRIPT COMPLETE!"
+        print "The script took a total of", checkTime() + "."
+        print "---------------------"
 
