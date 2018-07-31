@@ -25,6 +25,7 @@
 ############################
 
 import os, sys
+import numpy as np
 
 import time
 start_time = time.time()
@@ -58,6 +59,19 @@ county_outline_folder = r'N:\Remote Sensing Projects\2016 Cooperative Agreement 
 
 output_folder = r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst'
 
+## Define if any masks will be used. If none, set these parameters = [].
+## The parameter neg_masks is where you would put feature classes which
+##  exclude any farm premises for being there. An example would be water bodies.
+## The parameter pos_masks is the opposite; farms cannot be placed outside of
+##  these areas. An example would be public land boundaries.
+## Both neg_masks (negative masks) and pos_masks (positive masks) should be
+##  formatted like this, with '#' representing the buffer distance in Meters:
+##          neg_mask =[[r'C:\file_path\file', #],
+##                     [r'C:\alt_file_path\file2', #]]
+## Note that buffer distance can be 0.
+neg_masks = []
+pos_masks = []
+
 ## Define the maximum and minimum Length(L) or AspRatio(AR) values
 ##  (which came from the Batch file). Any points outisde of these bounds
 ##  are deleted automatically. L values are in meters.
@@ -65,20 +79,40 @@ L_max_threshold = 800   # Fill this with 99999 if you don't want to delete based
 L_min_threshold = 35    # Fill this with 0 if you don't want to delete based on min Length
 AR_max_threshold = 10   # Fill this with 99999 if you don't want to delete based on max AspRatio
 AR_min_threshold = 1.3  # Fill this with 0 if you don't want to delete based on min AspRatio
+
+## Overwrite certain parameters set above, if this tool is run as a custom
+##  ArcGIS Python tool. The values will be determined by the user.
+if runScriptAsTool == True:
+    clusterList = arcpy.GetParameterAsText(0)   # This should be in list format, but can contain a single entry
+    negative_masks = arcpy.GetParameterAsText(1)       # Multivalue should be set to Yes and Type should be Optional
+    negative_buffer_dist = arcpy.GetParameterAsText(1) # Multivalue should be set to Yes and Type should be Optional
+    positive_masks = arcpy.GetParameterAsText(2)       # Multivalue should be set to Yes and Type should be Optional
+    positive_buffer_dist = arcpy.GetParameterAsText(1) # Multivalue should be set to Yes and Type should be Optional
+    L_max_threshold = arcpy.GetParameterAsText(3)  # Set default to 800
+    L_min_threshold = arcpy.GetParameterAsText(4)  # Set default to 35
+    AR_max_threshold = arcpy.GetParameterAsText(5) # Set defualt to 10
+    AR_min_threshold = arcpy.GetParameterAsText(6) # Set default to 1.3
+    saveIntermediates = arcpy.GetparameterAsText(7)# Set default to True
+
+    if not len(negative_masks) == len(negative_buffer_dist) and \
+       not len(positive_masks) == len(positive_buffer_dist):
+        raise Exception("Error: There must be an equal number of entries in the negative_masks & " \
+                        + "negative_buffer_dist parameters. Likewise for positive_masks and positive_buffer_dist.")
+        
+    else:
+        neg_masks, pos_masks = [], []
+        for index in range(0, len(negative_masks)):
+            neg_masks.append([negative_masks[index], negative_buffer_dist[index]])
+
+        for index in range(0, len(positive_masks)):
+            pos_masks.append([positive_masks[index], positive_buffer_dist[index]])
+
+        
 thresholds = [
               [L_max_threshold, L_min_threshold],   ## This section just makes it so that we don't need
               [AR_max_threshold, AR_min_threshold], ##  so many input parameters for the LAR function
              ]
 
-## Overwrite certain parameters set above, if this tool is run as a custom
-##  ArcGIS Python tool. The values will be determined by the user.
-if runScriptAsTool == True:
-    clusterList = arcpy.GetParametersAsText(0)   # This should be in list format, but can contain a single entry
-    L_max_threshold = arcpy.GetParametersAsText(1)  # Set default to 800
-    L_min_threshold = arcpy.GetParametersAsText(2)  # Set default to 35
-    AR_max_threshold = arcpy.GetParametersAsText(3) # Set defualt to 10
-    AR_min_threshold = arcpy.GetParametersAsText(4) # Set default to 1.3
-    saveIntermediates = arcpy.GetparametersAsText(5)# Set default to True
     
 ############################
 #### NAMING CONVENTIONS ####
@@ -266,8 +300,7 @@ def LAR(input_feature, thresholds, output_location, state_abbrev, county_name):
     AR_max_threshold = thresholds [1][0]
     AR_min_threshold = thresholds [1][1]
 
-    #outputName = 'LAR' + '_' + state_abbrev + '_' + county_name
-    outputName = 'LAR' + '_' + state_abbrev + '_' + county_name + '_LAR' # DELETE THIS WHEN NO LONGER TESTING LENGTH
+    outputName = 'LAR' + '_' + state_abbrev + '_' + county_name
     outputFilePath = os.path.join(output_location, outputName)
 
     arcpy.CopyFeatures_management (input_feature, outputFilePath)
@@ -299,10 +332,78 @@ def LAR(input_feature, thresholds, output_location, state_abbrev, county_name):
     return outputFilePath
 
     
-def masking(variable1, variable2, state_abbrev, county_name):
+def masking(input_feature, state_abbrev, county_name, county_outline, neg_masks=[], pos_masks=[], ):
+    ##
+    ## This function uses the Erase tool to remove any points with a set distance
+    ##  of the files in the neg_masks list. It also uses the Clip tool to
+    ##  remove any points that are NOT within a set distance of files in the
+    ##  pos_masks list.
+    ##
+    ## Both neg_masks (negative masks) and pos_masks (positive masks) should
+    ##  look similar to this, with # representing the buffer distance in Meters:
+    ##      [[r'C:\file_path\file', #],
+    ##       [r'C:\alt_file_path\file2', #]]
+    ##
     
     county_name = nameFormat(county_name)
-    ()
+    outputName = 'Masking' + '_' + state_abbrev + '_' + county_name
+    outputFilePath = os.path.join(output_location, outputName)
+    neg_masks = np.array(neg_masks)
+    pos_masks = np.array(neg_masks)
+
+    def clip_buffer(input_feature, mask):
+        clip_temp = 'in_memory\clipped_mask_temp' # Where the temporary clipped file will be stored
+
+        ## Create a temporary clipped file of the mask
+        arcpy.Clip_analysis(in_features = mask[0], \
+                        clip_features = county_outline, \
+                        out_feature_class = clip_temp, \
+                        cluster_tolerance = "")
+        
+        buff_temp = 'in\memory\buffer_mask_temp' # Where the temporary buffer file will be stored
+
+        if neg_mask[1] > 0:
+            ## Create a temporary buffer around the clipped file, but only if the buffer distance is >0
+            arcpy.Buffer_analysis(in_features = clip_temp, \
+                            out_feature_class = buff_temp, \
+                            buffer_distance_or_field = '%s Meters' %mask[1], \
+                        )
+        else:
+            buff_temp = clip_temp
+
+        return [clip_temp, buff_temp]
+
+
+    for neg_mask in neg_masks:
+        
+        temp_files = clip_buffer(input_feature, neg_mask)
+
+        arcpy.Erase_analysis(in_features = input_feature, \
+                             erase_features = temp_files[1], \
+                             out_feature_class = output_feature)
+
+        arcpy.Delete_management(temp_files[0])
+        if not temp_files[0] == temp_files[1]:
+            arcpy.Delete_management(temp_files[1])
+            
+    for pos_mask in pos_masks:
+        
+        temp_files = clip_buffer(input_feature, pos_mask)
+
+        arcpy.Clip_analysis(in_features = input_feature, \
+                            clip_features = temp_files[1], \
+                            out_feature_class = output_feature)
+
+        arcpy.Delete_management(temp_files[0])
+        if not temp_files[0] == temp_files[1]:
+            arcpy.Delete_management(temp_files[1])
+        
+
+    ## Both neg_masks and pos_masks are default (empty), then simply pass the input_feature out of the function
+    if neg_masks == [] and pos_masks == []:
+        output_feature = input_feature
+                             
+    return output_feature
 
 def probSurface(input_point_data, raster_dataset, output_location, state_abbrev, county_name):
     ##
@@ -315,8 +416,7 @@ def probSurface(input_point_data, raster_dataset, output_location, state_abbrev,
 
     threshold = 0.15
 
-    #outputName = 'ProbSurf_' + state_abbrev + '_' + county_name
-    outputName = 'ProbSurf_' + state_abbrev + '_' + county_name + '_LAR' # DELETE THIS WHEN NO LONGER TESTING LENGTH
+    outputName = 'ProbSurf_' + state_abbrev + '_' + county_name
     outputFilePath = os.path.join(output_location, outputName)
 
     arcpy.CopyFeatures_management (input_point_data, outputFilePath)
@@ -349,12 +449,10 @@ def collapsePoints(input_point_data, output_location, state_abbrev, county_name)
     state_name = nameFormat(state_abbrev_to_name[state_abbrev])
 
     ## Set up names and FilePaths for the Ingetrate and CollectEvents files
-    #integrateOutputName = 'Integrate_' + state_abbrev + '_' + county_name
-    integrateOutputName = 'Integrate_' + state_abbrev + '_' + county_name + '_LAR' # DELETE THIS WHEN NO LONGER TESTING LENGTH
+    integrateOutputName = 'Integrate_' + state_abbrev + '_' + county_name
 
     integrateOutputFilePath = os.path.join(output_location, integrateOutputName)
-    #collectEventsOutputName = 'CollectEvents' + '_' + state_abbrev + '_' + county_name
-    collectEventsOutputName = 'CollectEvents' + '_' + state_abbrev + '_' + county_name + '_LAR' # DELETE THIS WHEN NO LONGER TESTING LENGTH
+    collectEventsOutputName = 'CollectEvents' + '_' + state_abbrev + '_' + county_name
     collectEventsOutputFilePath = os.path.join(output_location, collectEventsOutputName)
 
     if arcpy.Exists(integrateOutputFilePath):
@@ -386,9 +484,7 @@ def project(input_data, output_location, state_abbrev, county_name, UTM_code):
 
     county_name = nameFormat(county_name)
 
-    #outputName = 'AutoReview_' + state_abbrev + '_' + county_name
-    outputName = 'AutoReview_' + state_abbrev + '_' + county_name + '_LAR' # DELETE THIS WHEN NO LONGER TESTING LENGTH
-
+    outputName = 'AutoReview_' + state_abbrev + '_' + county_name
     outputFilePath = os.path.join(output_location, outputName)
 
     meridian = centralMeridian[int(UTM_code)] ## centralMeridian is a dictionary found in Setting_up_counties_database.py
@@ -483,15 +579,22 @@ if __name__ == '__main__':
                 
             #          #
             #  MASKING #
-            #          #  
-            #PLACEHOLDER
+            #          #
+            print "Applying Length/AspRatio thresholds for", state_name, county_name + "..."              
+            try:
+                maskFile = masking(larFile, state_abbrev, county_name, county_outline, neg_masks=[], pos_masks=[], ):
+                print "Mask applied. Script duration so far:", checkTime()
+            except:
+                e = sys.exc_info()[1]
+                print(e.args[0])
+                errors.append(['Masking', state_abbrev, county_name, e.args[0] ])
 
             #           #
             #PROBSURFACE#
             #           # 
             print "Applying probability surface for", state_name, county_name
             try:
-                probSurfaceFile = probSurface(larFile, probSurfaceRaster, batchGDB, state_abbrev, county_name)
+                probSurfaceFile = probSurface(maskFile, probSurfaceRaster, batchGDB, state_abbrev, county_name)
                 print "Probability surface applied. Script duration so far:", checkTime()
             except:
                 e = sys.exc_info()[1]
