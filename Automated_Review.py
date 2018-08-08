@@ -45,12 +45,16 @@ from Converting_state_names_and_abreviations import *
 ######## PARAMETERS ########
 ############################
 
-runScriptAsTool = True # This will overwrite any preset parameters by the ArcGIS tool inputs
+runScriptAsTool = False # This will overwrite any preset parameters by the ArcGIS tool inputs
 
 saveIntermediates = True   # Change to false if you don't care about the intermediate files
 
-clusterList = [] # A list of the file paths to all the relevant cluster GDBs. You can manually
-                 #  input entries if runScriptAsTool = False
+clusterList = [
+    r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst\North_Carolina\BatchGDB_NC_Z17_c1.gdb',
+    r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst\North_Carolina\BatchGDB_NC_Z18_c5.gdb',
+    r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst\Tennessee\BatchGDB_TN_Z16_c1.gdb',
+    ] # A list of the file paths to all the relevant cluster GDBs. You can manually
+      #  input entries if runScriptAsTool = False
 
 ## Location of probability surface raster
 probSurfaceRaster = r'N:\FLAPS from Chris Burdett\Data\poultry_prob_surface\poultryMskNrm\poultryMskNrm.tif'
@@ -75,10 +79,10 @@ pos_masks = []
 ## Define the maximum and minimum Length(L) or AspRatio(AR) values
 ##  (which came from the Batch file). Any points outisde of these bounds
 ##  are deleted automatically. L values are in meters.
-L_max_threshold = 800   # Fill this with 99999 if you don't want to delete based on max Length
-L_min_threshold = 35    # Fill this with 0 if you don't want to delete based on min Length
-AR_max_threshold = 10   # Fill this with 99999 if you don't want to delete based on max AspRatio
-AR_min_threshold = 1.3  # Fill this with 0 if you don't want to delete based on min AspRatio
+L_max_threshold = 99999   # Fill this with 99999 if you don't want to delete based on max Length
+L_min_threshold = 0    # Fill this with 0 if you don't want to delete based on min Length
+AR_max_threshold = 99999   # Fill this with 99999 if you don't want to delete based on max AspRatio
+AR_min_threshold = 0  # Fill this with 0 if you don't want to delete based on min AspRatio
 
 ## Overwrite certain parameters set above, if this tool is run as a custom
 ##  ArcGIS Python tool. The values will be determined by the user.
@@ -98,7 +102,7 @@ if runScriptAsTool == True:
        not len(positive_masks) == len(positive_buffer_dist):
         raise Exception("Error: There must be an equal number of entries in the negative_masks & " \
                         + "negative_buffer_dist parameters. Likewise for positive_masks and positive_buffer_dist.")
-        
+    
     else:
         neg_masks, pos_masks = [], []
         for index in range(0, len(negative_masks)):
@@ -124,7 +128,7 @@ thresholds = [
 ##
 ## Some files will not have Z[##], c[#], or [CountyName].
 ##
-##      [prefix] -> a unique identifier for each type of file
+##      [prefix] -> a unique identifier for each type of file, below is a dictionary explaining each prefix
 ##      [ST] -> the state abbreviation
 ##      Z[##] -> the UTM zone number
 ##      c[#] -> the cluster number
@@ -151,9 +155,15 @@ prefix_dict = {
 
 
 ############################
-#### DEFINE FUNCTIONS #####
+#### DEFINE FUNCTIONS ######
 ############################
 
+    ##
+    ## Note: when a function has several arguments, they should generally
+    ##  go in the following order (if a parameter is not needed, skip it):
+    ##      (input_file, critical_inputs, output_location, state_abbrev, \
+##           county_name, {optional_parameters})
+    ##
 def checkTime():
     ##
     ## This function returns a string of how many minutes or hours the
@@ -176,11 +186,11 @@ def findBatch(clusterGDB):
     ##
     walkList = []   ## This will hold all of the file paths to the files wuithin the folder
 
-    walk = arcpy.da.Walk(clusterGDB, datatype = "Point")
+    walk = arcpy.da.Walk(clusterGDB, type="Point")
 
     for dirpath, dirnames, filenames in walk:
         for filename in filenames:
-            if filename[:6] = 'Batch_':
+            if filename[:6] == 'Batch_':
                 county_name = filename[9:]
                 path = os.path.join(dirpath, filename)
                 walkList.append([county_name, path])
@@ -223,10 +233,10 @@ def add_FIPS_info(input_feature, state_abbrev, county_name):
         FIPS, UTM = FIPS_UTM(county_outline)
         
         ## Add a new field to store FIPS information. This field will hold the FIPS but remove leading zeroes
-        arcpy.AddField_management(in_table = input_feature, field_name = "FIPS", \
-                                  field_type = "SHORT", field_precision = "", \
-                                  field_scale = "", field_length = "", field_alias = "", \
-                                  field_is_nullable = "NULLABLE", \
+        arcpy.AddField_management(in_table = input_feature, field_name = "FIPS", 
+                                  field_type = "LONG", field_precision = "", 
+                                  field_scale = "", field_length = "", field_alias = "", 
+                                  field_is_nullable = "NULLABLE", 
                                   field_is_required = "NON_REQUIRED", field_domain = "")
 
         ## Fill FIPS field with UTM info (DOES NOT FUNCTION PROPERLY)
@@ -243,10 +253,10 @@ def add_FIPS_info(input_feature, state_abbrev, county_name):
 
         ## Add a second field to store FIPS information. This field will hold the
         ##  FIPS as a string and will NOT remove leading zeroes
-        arcpy.AddField_management(in_table = input_feature, field_name = "FIPS2", \
-                                  field_type = "TEXT", field_precision = "", \
-                                  field_scale = "", field_length = "", field_alias = "", \
-                                  field_is_nullable = "NULLABLE", \
+        arcpy.AddField_management(in_table = input_feature, field_name = "FIPS2", 
+                                  field_type = "TEXT", field_precision = "", 
+                                  field_scale = "", field_length = "", field_alias = "", 
+                                  field_is_nullable = "NULLABLE", 
                                   field_is_required = "NON_REQUIRED", field_domain = "")
 
         ## Fill FIPS field with UTM info
@@ -276,9 +286,9 @@ def clip(input_feature, clip_files, output_location, state_abbrev, county_name):
     outputFilePath = os.path.join(output_location, outputName)
 
     ## Do the clip
-    arcpy.Clip_analysis(in_features = input_feature, \
-                        clip_features = clip_files, \
-                        out_feature_class = outputFilePath, \
+    arcpy.Clip_analysis(in_features = input_feature, 
+                        clip_features = clip_files, 
+                        out_feature_class = outputFilePath, 
                         cluster_tolerance = "")
 
     add_FIPS_info(outputFilePath, state_abbrev, county_name)
@@ -306,16 +316,16 @@ def LAR(input_feature, thresholds, output_location, state_abbrev, county_name):
     arcpy.CopyFeatures_management (input_feature, outputFilePath)
 
     ## Add the AspRatio field
-    arcpy.AddField_management(in_table = outputFilePath, \
-                              field_name = "AspRatio", field_type = "FLOAT", \
-                              field_precision = "", field_scale = "", field_length = "", \
-                              field_alias = "", field_is_nullable = "NULLABLE", \
+    arcpy.AddField_management(in_table = outputFilePath, 
+                              field_name = "AspRatio", field_type = "FLOAT", 
+                              field_precision = "", field_scale = "", field_length = "", 
+                              field_alias = "", field_is_nullable = "NULLABLE", 
                               field_is_required = "NON_REQUIRED", field_domain = "")
 
     ## Fill the AspRatio field that was just created
-    arcpy.CalculateField_management(in_table = outputFilePath, \
-                                    field = "AspRatio", \
-                                    expression = "!Length!/!Width!", \
+    arcpy.CalculateField_management(in_table = outputFilePath, 
+                                    field = "AspRatio", 
+                                    expression = "!Length!/!Width!", 
                                     expression_type = "PYTHON_9.3", code_block = "")
 
     ## Delete features based on the Length and AspRatio fields
@@ -332,7 +342,7 @@ def LAR(input_feature, thresholds, output_location, state_abbrev, county_name):
     return outputFilePath
 
     
-def masking(input_feature, state_abbrev, county_name, county_outline, neg_masks=[], pos_masks=[], ):
+def masking(input_feature, output_location, state_abbrev, county_name, county_outline, neg_masks=[], pos_masks=[] ):
     ##
     ## This function uses the Erase tool to remove any points with a set distance
     ##  of the files in the neg_masks list. It also uses the Clip tool to
@@ -355,18 +365,18 @@ def masking(input_feature, state_abbrev, county_name, county_outline, neg_masks=
         clip_temp = 'in_memory\clipped_mask_temp' # Where the temporary clipped file will be stored
 
         ## Create a temporary clipped file of the mask
-        arcpy.Clip_analysis(in_features = mask[0], \
-                        clip_features = county_outline, \
-                        out_feature_class = clip_temp, \
+        arcpy.Clip_analysis(in_features = mask[0], 
+                        clip_features = county_outline, 
+                        out_feature_class = clip_temp, 
                         cluster_tolerance = "")
         
         buff_temp = 'in\memory\buffer_mask_temp' # Where the temporary buffer file will be stored
 
         if neg_mask[1] > 0:
             ## Create a temporary buffer around the clipped file, but only if the buffer distance is >0
-            arcpy.Buffer_analysis(in_features = clip_temp, \
-                            out_feature_class = buff_temp, \
-                            buffer_distance_or_field = '%s Meters' %mask[1], \
+            arcpy.Buffer_analysis(in_features = clip_temp, 
+                            out_feature_class = buff_temp, 
+                            buffer_distance_or_field = '%s Meters' %mask[1], 
                         )
         else:
             buff_temp = clip_temp
@@ -390,8 +400,8 @@ def masking(input_feature, state_abbrev, county_name, county_outline, neg_masks=
         
         temp_files = clip_buffer(input_feature, pos_mask)
 
-        arcpy.Clip_analysis(in_features = input_feature, \
-                            clip_features = temp_files[1], \
+        arcpy.Clip_analysis(in_features = input_feature, 
+                            clip_features = temp_files[1], 
                             out_feature_class = output_feature)
 
         arcpy.Delete_management(temp_files[0])
@@ -402,6 +412,9 @@ def masking(input_feature, state_abbrev, county_name, county_outline, neg_masks=
     ## Both neg_masks and pos_masks are default (empty), then simply pass the input_feature out of the function
     if neg_masks == [] and pos_masks == []:
         output_feature = input_feature
+
+    ## Add the old file to the list of intermediate files
+    intermed_list.append(input_feature)
                              
     return output_feature
 
@@ -476,7 +489,7 @@ def collapsePoints(input_point_data, output_location, state_abbrev, county_name)
     return collectEventsOutputFilePath
 
 
-def project(input_data, output_location, state_abbrev, county_name, UTM_code):
+def project(input_data, UTM_code, output_location, state_abbrev, county_name):
     ##
     ## This function projects the input from the UTM county projection into
     ##  WGS 1984 Geographic Coordinate System.
@@ -533,7 +546,7 @@ if __name__ == '__main__':
 
     for clusterGDB in clusterList:
         
-        state_abbrev, batchList = findBatch(cluster)
+        state_abbrev, batchList = findBatch(clusterGDB)
         state_name = nameFormat(state_abbrev_to_name[state_abbrev])
 
         for countyBatch in batchList:
@@ -546,19 +559,19 @@ if __name__ == '__main__':
                                 #  saveIntermediates is True or False
 
             county_name = countyBatch[0]
+            batch_location = countyBatch[1]
+            
             county_outline = os.path.join(county_outline_folder,
                                           state_name + '.gdb',
                                           county_name + 'Co' + state_abbrev + '_outline')
             FIPS, UTM = FIPS_UTM(county_outline)
-
-            batchLocation = countyBatch[1]
 
             #          #
             # CLIPPING #
             #          #
             print "Clipping", state_name, county_name + "..."
             try:
-                clipFile = clip(batchLocation, county_outline, clusterGDB, state_abbrev, county_name)
+                clipFile = clip(batch_location, county_outline, clusterGDB, state_abbrev, county_name)
                 print "Clipped. Script duration so far:", checkTime()
             except:
                 e = sys.exc_info()[1]
@@ -570,7 +583,7 @@ if __name__ == '__main__':
             #          # 
             print "Applying Length/AspRatio thresholds for", state_name, county_name + "..."              
             try:
-                larFile = LAR(clipFile, thresholds, batchGDB, state_abbrev, county_name)
+                larFile = LAR(clipFile, thresholds, clusterGDB, state_abbrev, county_name)
                 print "LAR thresholds applied. Script duration so far:", checkTime()
             except:
                 e = sys.exc_info()[1]
@@ -580,21 +593,25 @@ if __name__ == '__main__':
             #          #
             #  MASKING #
             #          #
-            print "Applying Length/AspRatio thresholds for", state_name, county_name + "..."              
-            try:
-                maskFile = masking(larFile, state_abbrev, county_name, county_outline, neg_masks=[], pos_masks=[], ):
-                print "Mask applied. Script duration so far:", checkTime()
-            except:
-                e = sys.exc_info()[1]
-                print(e.args[0])
-                errors.append(['Masking', state_abbrev, county_name, e.args[0] ])
+            print "Applying Masks for", state_name, county_name + "..."
+            if not neg_masks == [] and pos_masks == []:
+                try:
+                    maskFile = masking(larFile, clusterGDB, state_abbrev, county_name, county_outline, neg_masks, pos_masks)
+                    print "Mask applied. Script duration so far:", checkTime()
+                except:
+                    e = sys.exc_info()[1]
+                    print(e.args[0])
+                    errors.append(['Masking', state_abbrev, county_name, e.args[0] ])
+            else:
+                print "No masking files selected."
+                maskFile = larFile  # This essentially just skips the masking step
 
             #           #
             #PROBSURFACE#
             #           # 
             print "Applying probability surface for", state_name, county_name
             try:
-                probSurfaceFile = probSurface(maskFile, probSurfaceRaster, batchGDB, state_abbrev, county_name)
+                probSurfaceFile = probSurface(maskFile, probSurfaceRaster, clusterGDB, state_abbrev, county_name)
                 print "Probability surface applied. Script duration so far:", checkTime()
             except:
                 e = sys.exc_info()[1]
@@ -606,7 +623,7 @@ if __name__ == '__main__':
             #          # 
             print "Collapsing points for", state_name, county_name
             try:
-                collapsePointsFile = collapsePoints(probSurfaceFile, batchGDB, state_abbrev, county_name)
+                collapsePointsFile = collapsePoints(probSurfaceFile, clusterGDB, state_abbrev, county_name)
                 print "Points collapsed. Script duration so far:", checkTime()
             except:
                 e = sys.exc_info()[1]
@@ -618,7 +635,7 @@ if __name__ == '__main__':
             #          #                               
             print "Projecting Automated Review for", state_name, county_name
             try:
-                autoReviewFile = project(collapsePointsFile, batchGDB, state_abbrev, county_name, UTM)
+                autoReviewFile = project(collapsePointsFile, UTM, clusterGDB, state_abbrev, county_name)
                 print "Projected. Script duration so far:", checkTime()
             except:
                 e = sys.exc_info()[1]
@@ -628,18 +645,18 @@ if __name__ == '__main__':
             if saveIntermediates == False:
                 deleteIntermediates(intermed_list)
 
-        if errors == []:
-            print "\n\nNo counties had any errors!"
-        else:
-            print "\n\nThe following counties had errors:"
-            for row in errors:
-                print row[0], row[1], row[2]
+    if errors == []:
+        print "\n\nNo counties had any errors!"
+    else:
+        print "\n\nThe following counties had errors:"
+        for row in errors:
+            print row[0], row[1], row[2]
 
-        ############################
-        ######### CLEANUP ##########
-        ############################
-        
-        print "---------------------\nSCRIPT COMPLETE!"
-        print "The script took a total of", checkTime() + "."
-        print "---------------------"
+    ############################
+    ######### CLEANUP ##########
+    ############################
+    
+    print "---------------------\nSCRIPT COMPLETE!"
+    print "The script took a total of", checkTime() + "."
+    print "---------------------"
 
