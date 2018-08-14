@@ -5,14 +5,15 @@
 ############################
 
 ##
-## Created by David South 7/9/18, updated N/A
+## Created by David South 7/9/18, updated 8/9/18
 ##
 ## Script Description:
-##
-## This scirpt would be great to make an ArcGIS tool out of.
-##
-## Note: as the script stands now, save each individual step along the way
-##  Have a boolean that allows you to save all steps, or not
+##      This script is intended for use with remotely sensed poultry data
+##       exported from the Feature Analyst extension in vector point form.
+##      It is intended to be used to remove clutter from the input dataset
+##       using various methods. It requires a probability surface raster,
+##       as well as county polygon files for each county that will be
+##       referenced during the course of the script.
 ##
 ## This script is designed to be used as a custom ArcGIS tool. Instructions
 ##  for setting it up in ArcGIS will be included. Reference this URL:
@@ -45,14 +46,13 @@ from Converting_state_names_and_abreviations import *
 ######## PARAMETERS ########
 ############################
 
-runScriptAsTool = False # This will overwrite any preset parameters by the ArcGIS tool inputs
+runScriptAsTool = False ## This will overwrite any preset parameters by the ArcGIS tool inputs
+                        ## Note that this is untested and may require some alteraetions.
 
 saveIntermediates = True   # Change to false if you don't care about the intermediate files
 
 clusterList = [
-    r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst\North_Carolina\BatchGDB_NC_Z17_c1.gdb',
-    r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst\North_Carolina\BatchGDB_NC_Z18_c5.gdb',
-    r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst\Tennessee\BatchGDB_TN_Z16_c1.gdb',
+    r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst\Alabama\BatchGDB_AL_Z16_c1_mask_test.gdb'
     ] # A list of the file paths to all the relevant cluster GDBs. You can manually
       #  input entries if runScriptAsTool = False
 
@@ -63,6 +63,8 @@ county_outline_folder = r'N:\Remote Sensing Projects\2016 Cooperative Agreement 
 
 output_folder = r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst'
 
+prob_surface_threshold = 0.15   # Points with values < 0.15 will be deleted
+
 ## Define if any masks will be used. If none, set these parameters = [].
 ## The parameter neg_masks is where you would put feature classes which
 ##  exclude any farm premises for being there. An example would be water bodies.
@@ -72,9 +74,14 @@ output_folder = r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst'
 ##  formatted like this, with '#' representing the buffer distance in Meters:
 ##          neg_mask =[[r'C:\file_path\file', #],
 ##                     [r'C:\alt_file_path\file2', #]]
-## Note that buffer distance can be 0.
-neg_masks = []
-pos_masks = []
+## Note that buffer distance can be 0. Set = [] if no masks.
+neg_masks = [
+             [r'N:\Geo_data\ESRI_Data\ESRI_Base_Data_2014\usa\census\urban.gdb\urban', 0],
+             [r'N:\Geo_data\ESRI_Data\ESRI_Base_Data_2012\streetmap_na\data\streets.sdc\streets', 20]
+            ]
+pos_masks = [
+        
+            ]
 
 ## Define the maximum and minimum Length(L) or AspRatio(AR) values
 ##  (which came from the Batch file). Any points outisde of these bounds
@@ -88,15 +95,16 @@ AR_min_threshold = 0  # Fill this with 0 if you don't want to delete based on mi
 ##  ArcGIS Python tool. The values will be determined by the user.
 if runScriptAsTool == True:
     clusterList = arcpy.GetParameterAsText(0)   # This should be in list format, but can contain a single entry
-    negative_masks = arcpy.GetParameterAsText(1)       # Multivalue should be set to Yes and Type should be Optional
-    negative_buffer_dist = arcpy.GetParameterAsText(1) # Multivalue should be set to Yes and Type should be Optional
-    positive_masks = arcpy.GetParameterAsText(2)       # Multivalue should be set to Yes and Type should be Optional
-    positive_buffer_dist = arcpy.GetParameterAsText(1) # Multivalue should be set to Yes and Type should be Optional
-    L_max_threshold = arcpy.GetParameterAsText(3)  # Set default to 800
-    L_min_threshold = arcpy.GetParameterAsText(4)  # Set default to 35
-    AR_max_threshold = arcpy.GetParameterAsText(5) # Set defualt to 10
-    AR_min_threshold = arcpy.GetParameterAsText(6) # Set default to 1.3
-    saveIntermediates = arcpy.GetparameterAsText(7)# Set default to True
+    prob_surface_threshold = arpy.GetParametersAsText(1) # Set default to 0.15
+    negative_masks = arcpy.GetParameterAsText(2)       # Multivalue should be set to Yes and Type should be Optional
+    negative_buffer_dist = arcpy.GetParameterAsText(3) # Multivalue should be set to Yes and Type should be Optional
+    positive_masks = arcpy.GetParameterAsText(4)       # Multivalue should be set to Yes and Type should be Optional
+    positive_buffer_dist = arcpy.GetParameterAsText(5) # Multivalue should be set to Yes and Type should be Optional
+    L_max_threshold = arcpy.GetParameterAsText(6)  # Set default to 800
+    L_min_threshold = arcpy.GetParameterAsText(7)  # Set default to 35
+    AR_max_threshold = arcpy.GetParameterAsText(8) # Set defualt to 10
+    AR_min_threshold = arcpy.GetParameterAsText(9) # Set default to 1.3
+    saveIntermediates = arcpy.GetparameterAsText(10)# Set default to True
 
     if not len(negative_masks) == len(negative_buffer_dist) and \
        not len(positive_masks) == len(positive_buffer_dist):
@@ -162,8 +170,9 @@ prefix_dict = {
     ## Note: when a function has several arguments, they should generally
     ##  go in the following order (if a parameter is not needed, skip it):
     ##      (input_file, critical_inputs, output_location, state_abbrev, \
-##           county_name, {optional_parameters})
+    ##       county_name, {optional_parameters})
     ##
+
 def checkTime():
     ##
     ## This function returns a string of how many minutes or hours the
@@ -294,7 +303,8 @@ def clip(input_feature, clip_files, output_location, state_abbrev, county_name):
     add_FIPS_info(outputFilePath, state_abbrev, county_name)
                                     
     ## Add the old file to the list of intermediate files
-    intermed_list.append(input_feature)
+    if __name__ == '__main__':
+        intermed_list.append(input_feature)
 
     return outputFilePath
 
@@ -337,8 +347,9 @@ def LAR(input_feature, thresholds, output_location, state_abbrev, county_name):
                 deleteCursor.deleteRow()
 
     ## Add the old file to the list of intermediate files
-    intermed_list.append(input_feature)
-
+    if __name__ == '__main__':
+        intermed_list.append(input_feature)
+        
     return outputFilePath
 
     
@@ -354,15 +365,28 @@ def masking(input_feature, output_location, state_abbrev, county_name, county_ou
     ##      [[r'C:\file_path\file', #],
     ##       [r'C:\alt_file_path\file2', #]]
     ##
+
+    ## Both neg_masks and pos_masks are default (empty), then simply pass the input_feature out of the function
+    if neg_masks == [] and pos_masks == []:
+        return input_feature
     
     county_name = nameFormat(county_name)
     outputName = 'Masking' + '_' + state_abbrev + '_' + county_name
     outputFilePath = os.path.join(output_location, outputName)
-    neg_masks = np.array(neg_masks)
-    pos_masks = np.array(neg_masks)
+    neg_masks = neg_masks
+    pos_masks = pos_masks
 
-    def clip_buffer(input_feature, mask):
-        clip_temp = 'in_memory\clipped_mask_temp' # Where the temporary clipped file will be stored
+    if arcpy.Exists(outputFilePath):
+        arcpy.Delete_management(outputFilePath)
+
+    def clip_buffer(mask):
+        ##
+        ## This function is a small thing to clip the mask file to the county
+        ##  to chop it into a manageable size. The file is buffered if required.
+        ##  This function is used for each mask. This mini-function is not for
+        ##  clipping or erasing the point file input data.
+        ##
+        clip_temp = os.path.join(output_location,'clipped_mask_temp') # Where the temporary clipped file will be stored
 
         ## Create a temporary clipped file of the mask
         arcpy.Clip_analysis(in_features = mask[0], 
@@ -370,53 +394,83 @@ def masking(input_feature, output_location, state_abbrev, county_name, county_ou
                         out_feature_class = clip_temp, 
                         cluster_tolerance = "")
         
-        buff_temp = 'in\memory\buffer_mask_temp' # Where the temporary buffer file will be stored
+        buff_temp = os.path.join(output_location, 'buffer_mask_temp') # Where the temporary buffer file will be stored
 
-        if neg_mask[1] > 0:
+        if mask[1] > 0: # If there is a buffer value specified:
             ## Create a temporary buffer around the clipped file, but only if the buffer distance is >0
             arcpy.Buffer_analysis(in_features = clip_temp, 
                             out_feature_class = buff_temp, 
                             buffer_distance_or_field = '%s Meters' %mask[1], 
                         )
+            arcpy.Delete_management(clip_temp)
+            
         else:
+            ## Otherwise just use the un-buffered file
             buff_temp = clip_temp
 
-        return [clip_temp, buff_temp]
+        return buff_temp
 
+    ## This 'fileToRemovePointsFrom' variable is going to be changed throughout
+    ##  this function. It starts as the input feature, then will changed to
+    ##  be set as the current temporary file that is created during the process.
+    ##  This ensures that each time that points are removed, they are removed
+    ##  from the most recent version of the file so that the end result will
+    ##  be the cumulative result of all the masks at once.
+    fileToRemovePointsFrom = input_feature
 
-    for neg_mask in neg_masks:
-        
-        temp_files = clip_buffer(input_feature, neg_mask)
+    for maskType in ('neg', 'pos'): # Do this whole thing for both positive and negative masks
+        count = 0 # Start the count, this will be used to name temporary files
+        currentFile = ''
 
-        arcpy.Erase_analysis(in_features = input_feature, \
-                             erase_features = temp_files[1], \
-                             out_feature_class = output_feature)
+        if maskType == 'neg':
+            masksList = neg_masks
+            tempMaskFilePath = 'in_memory/neg_mask'
+        elif maskType == 'pos':
+            masksList = pos_masks
+            tempMaskFilePath = 'in_memory/pos_mask'
 
-        arcpy.Delete_management(temp_files[0])
-        if not temp_files[0] == temp_files[1]:
-            arcpy.Delete_management(temp_files[1])
-            
-    for pos_mask in pos_masks:
-        
-        temp_files = clip_buffer(input_feature, pos_mask)
+        if not masksList == []:
+            for mask in masksList:
+                count +=1
+                tempMaskFile = clip_buffer(mask)
 
-        arcpy.Clip_analysis(in_features = input_feature, 
-                            clip_features = temp_files[1], 
-                            out_feature_class = output_feature)
+                if ( pos_masks == [] and count == len(neg_masks) ) \
+                   or count == len(pos_masks):
+                    currentFile = outputFilePath
+                    ## This is basically saying that if this is the final mask that needs
+                    ##  to be applied, then don't make a temporary file, use the actual
+                    ##  output file name.
+                    
+                else:
+                    currentFile = tempMaskFilePath + str(count)
 
-        arcpy.Delete_management(temp_files[0])
-        if not temp_files[0] == temp_files[1]:
-            arcpy.Delete_management(temp_files[1])
-        
+                if maskType == 'neg' and not neg_masks == []:
+                    arcpy.Erase_analysis(in_features = fileToRemovePointsFrom, \
+                                         erase_features = tempMaskFile, \
+                                         out_feature_class = currentFile)
+                    
+                elif maskType == 'pos' and not pos_masks == []:
+                    arcpy.Clip_analysis(in_features = fileToRemovePointsFrom, 
+                                        clip_features = tempMaskFile, 
+                                        out_feature_class = currentFile)
 
-    ## Both neg_masks and pos_masks are default (empty), then simply pass the input_feature out of the function
-    if neg_masks == [] and pos_masks == []:
-        output_feature = input_feature
+                arcpy.Delete_management(tempMaskFile) # Get rid of the masking file, we don't need it
+
+                if arcpy.Exists(currentFile[:-1] + str(count - 1)):
+                    arcpy.Delete_management(currentFile[:-1] + str(count - 1))
+                    ## Does the previous version of 'currentFile' still exist?
+                    ## If so, delete that piece of junk, it's outdated.
+                                   
+                fileToRemovePointsFrom = currentFile
+                    ## Set the loop to preform all further changes to the
+                    ##  temporary file that was used prevously, so that all
+                    ##  the changes are present in a single file.
 
     ## Add the old file to the list of intermediate files
-    intermed_list.append(input_feature)
-                             
-    return output_feature
+    if __name__ == '__main__':
+        intermed_list.append(input_feature)
+        
+    return outputFilePath
 
 def probSurface(input_point_data, raster_dataset, output_location, state_abbrev, county_name):
     ##
@@ -426,8 +480,6 @@ def probSurface(input_point_data, raster_dataset, output_location, state_abbrev,
     ##
 
     county_name = nameFormat(county_name)
-
-    threshold = 0.15
 
     outputName = 'ProbSurf_' + state_abbrev + '_' + county_name
     outputFilePath = os.path.join(output_location, outputName)
@@ -440,7 +492,7 @@ def probSurface(input_point_data, raster_dataset, output_location, state_abbrev,
     ## Apply threshold - NOTE THIS WILL LIKELY BE CHANGED LATER
     with arcpy.da.UpdateCursor(outputFilePath, "ProbSurf_1") as cursor:
         for row in cursor:
-            if row[0] < threshold:
+            if row[0] < prob_surface_threshold:
                 cursor.deleteRow()
 
     ## Add the old file to the list of intermediate files
@@ -594,7 +646,7 @@ if __name__ == '__main__':
             #  MASKING #
             #          #
             print "Applying Masks for", state_name, county_name + "..."
-            if not neg_masks == [] and pos_masks == []:
+            if not neg_masks == [] and not pos_masks == []:
                 try:
                     maskFile = masking(larFile, clusterGDB, state_abbrev, county_name, county_outline, neg_masks, pos_masks)
                     print "Mask applied. Script duration so far:", checkTime()
