@@ -52,7 +52,7 @@ runScriptAsTool = False ## This will overwrite any preset parameters by the ArcG
 saveIntermediates = True   # Change to false if you don't care about the intermediate files
 
 clusterList = [
-    r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst\Alabama\BatchGDB_AL_Z16_c1_mask_test.gdb'
+    r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst\Alabama\BatchGDB_AL_Z16_c1_masks_test2.gdb'
     ] # A list of the file paths to all the relevant cluster GDBs. You can manually
       #  input entries if runScriptAsTool = False
 
@@ -61,9 +61,10 @@ probSurfaceRaster = r'N:\FLAPS from Chris Burdett\Data\poultry_prob_surface\poul
 
 county_outline_folder = r'N:\Remote Sensing Projects\2016 Cooperative Agreement Poultry Barns\Documents\Deliverables\Library\CountyOutlines'
 
+## This folder should be the location where all the state folders are, which will each store the GDBs of the state clusters
 output_folder = r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst'
 
-prob_surface_threshold = 0.15   # Points with values < 0.15 will be deleted
+prob_surface_threshold = 0.1   # Points with values < threshold will be deleted
 
 ## Define if any masks will be used. If none, set these parameters = [].
 ## The parameter neg_masks is where you would put feature classes which
@@ -77,7 +78,7 @@ prob_surface_threshold = 0.15   # Points with values < 0.15 will be deleted
 ## Note that buffer distance can be 0. Set = [] if no masks.
 neg_masks = [
              [r'N:\Geo_data\ESRI_Data\ESRI_Base_Data_2014\usa\census\urban.gdb\urban', 0],
-             [r'N:\Geo_data\ESRI_Data\ESRI_Base_Data_2012\streetmap_na\data\streets.sdc\streets', 20]
+             [r'N:\Geo_data\ESRI_Data\ESRI_Base_Data_2012\streetmap_na\data\streets.sdc\streets', 15]
             ]
 pos_masks = [
         
@@ -86,8 +87,8 @@ pos_masks = [
 ## Define the maximum and minimum Length(L) or AspRatio(AR) values
 ##  (which came from the Batch file). Any points outisde of these bounds
 ##  are deleted automatically. L values are in meters.
-L_max_threshold = 99999   # Fill this with 99999 if you don't want to delete based on max Length
-L_min_threshold = 0    # Fill this with 0 if you don't want to delete based on min Length
+L_max_threshold = 500   # Fill this with 99999 if you don't want to delete based on max Length
+L_min_threshold = 40   # Fill this with 0 if you don't want to delete based on min Length
 AR_max_threshold = 99999   # Fill this with 99999 if you don't want to delete based on max AspRatio
 AR_min_threshold = 0  # Fill this with 0 if you don't want to delete based on min AspRatio
 
@@ -95,7 +96,7 @@ AR_min_threshold = 0  # Fill this with 0 if you don't want to delete based on mi
 ##  ArcGIS Python tool. The values will be determined by the user.
 if runScriptAsTool == True:
     clusterList = arcpy.GetParameterAsText(0)   # This should be in list format, but can contain a single entry
-    prob_surface_threshold = arpy.GetParametersAsText(1) # Set default to 0.15
+    prob_surface_threshold = arpy.GetParametersAsText(1) # Set default to 0.1
     negative_masks = arcpy.GetParameterAsText(2)       # Multivalue should be set to Yes and Type should be Optional
     negative_buffer_dist = arcpy.GetParameterAsText(3) # Multivalue should be set to Yes and Type should be Optional
     positive_masks = arcpy.GetParameterAsText(4)       # Multivalue should be set to Yes and Type should be Optional
@@ -630,25 +631,14 @@ if __name__ == '__main__':
                 print(e.args[0])
                 errors.append(['Clip', state_abbrev, county_name, e.args[0] ])
 
-            #          #
-            #   LAR    #
-            #          # 
-            print "Applying Length/AspRatio thresholds for", state_name, county_name + "..."              
-            try:
-                larFile = LAR(clipFile, thresholds, clusterGDB, state_abbrev, county_name)
-                print "LAR thresholds applied. Script duration so far:", checkTime()
-            except:
-                e = sys.exc_info()[1]
-                print(e.args[0])
-                errors.append(['LAR', state_abbrev, county_name, e.args[0] ])
                 
             #          #
             #  MASKING #
             #          #
             print "Applying Masks for", state_name, county_name + "..."
-            if not neg_masks == [] and not pos_masks == []:
+            if not (neg_masks == [] and pos_masks == []):
                 try:
-                    maskFile = masking(larFile, clusterGDB, state_abbrev, county_name, county_outline, neg_masks, pos_masks)
+                    maskFile = masking(clipFile, clusterGDB, state_abbrev, county_name, county_outline, neg_masks, pos_masks)
                     print "Mask applied. Script duration so far:", checkTime()
                 except:
                     e = sys.exc_info()[1]
@@ -657,18 +647,33 @@ if __name__ == '__main__':
             else:
                 print "No masking files selected."
                 maskFile = larFile  # This essentially just skips the masking step
+                
+
+            #          #
+            #   LAR    #
+            #          # 
+            print "Applying Length/AspRatio thresholds for", state_name, county_name + "..."              
+            try:
+                larFile = LAR(maskFile, thresholds, clusterGDB, state_abbrev, county_name)
+                print "LAR thresholds applied. Script duration so far:", checkTime()
+            except:
+                e = sys.exc_info()[1]
+                print(e.args[0])
+                errors.append(['LAR', state_abbrev, county_name, e.args[0] ])
+                
 
             #           #
             #PROBSURFACE#
             #           # 
             print "Applying probability surface for", state_name, county_name
             try:
-                probSurfaceFile = probSurface(maskFile, probSurfaceRaster, clusterGDB, state_abbrev, county_name)
+                probSurfaceFile = probSurface(larFile, probSurfaceRaster, clusterGDB, state_abbrev, county_name)
                 print "Probability surface applied. Script duration so far:", checkTime()
             except:
                 e = sys.exc_info()[1]
                 print(e.args[0])
                 errors.append(['ProbSurf', state_abbrev, county_name, e.args[0] ])
+                
 
             #          #
             #   C2P    #
@@ -681,6 +686,7 @@ if __name__ == '__main__':
                 e = sys.exc_info()[1]
                 print(e.args[0])
                 errors.append(['Integrate or CollectEvents', state_abbrev, county_name, e.args[0] ])
+                
 
             #          #
             #PROJECTING#
@@ -696,6 +702,10 @@ if __name__ == '__main__':
                 
             if saveIntermediates == False:
                 deleteIntermediates(intermed_list)
+                
+
+            print '' # This just puts a blank line between each county
+            
 
     if errors == []:
         print "\n\nNo counties had any errors!"
