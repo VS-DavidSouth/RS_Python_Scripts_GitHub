@@ -52,7 +52,7 @@ runScriptAsTool = False ## This will overwrite any preset parameters by the ArcG
 saveIntermediates = True   # Change to false if you don't care about the intermediate files
 
 clusterList = [
-    r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst\Alabama\BatchGDB_AL_Z16_c1_masks_test2.gdb'
+     r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst\Alabama\BatchGDB_AL_Z16_c1.gdb'
     ] # A list of the file paths to all the relevant cluster GDBs. You can manually
       #  input entries if runScriptAsTool = False
 
@@ -73,12 +73,17 @@ prob_surface_threshold = 0.1   # Points with values < threshold will be deleted
 ##  these areas. An example would be public land boundaries.
 ## Both neg_masks (negative masks) and pos_masks (positive masks) should be
 ##  formatted like this, with '#' representing the buffer distance in Meters:
-##          neg_mask =[[r'C:\file_path\file', #],
-##                     [r'C:\alt_file_path\file2', #]]
+##          neg_mask =[
+##                     [r'C:\file_path\file', #],
+##                     [r'C:\alt_file_path\file2', #],
+##                    ]
 ## Note that buffer distance can be 0. Set = [] if no masks.
 neg_masks = [
              [r'N:\Geo_data\ESRI_Data\ESRI_Base_Data_2014\usa\census\urban.gdb\urban', 0],
-             [r'N:\Geo_data\ESRI_Data\ESRI_Base_Data_2012\streetmap_na\data\streets.sdc\streets', 15]
+             [r'N:\Geo_data\ESRI_Data\ESRI_Base_Data_2014\usa\census\urban.gdb\urban', 0],
+             [r'N:\Geo_data\ESRI_Data\ESRI_Base_Data_2012\streetmap_na\data\streets.sdc\streets', 15],
+             [r'N:\Geo_data\ESRI_Data\ESRI_Base_Data_2014\usa\hydro\dtl_wat.gdb\dtl_wat', 0],
+             [r'N:\Geo_data\ESRI_Data\ESRI_Base_Data_2014\usa\hydro\dtl_riv.gdb\dtl_riv', 10],
             ]
 pos_masks = [
         
@@ -121,7 +126,7 @@ if runScriptAsTool == True:
             pos_masks.append([positive_masks[index], positive_buffer_dist[index]])
 
         
-thresholds = [
+LAR_thresholds = [
               [L_max_threshold, L_min_threshold],   ## This section just makes it so that we don't need
               [AR_max_threshold, AR_min_threshold], ##  so many input parameters for the LAR function
              ]
@@ -310,16 +315,16 @@ def clip(input_feature, clip_files, output_location, state_abbrev, county_name):
     return outputFilePath
 
     
-def LAR(input_feature, thresholds, output_location, state_abbrev, county_name):
+def LAR(input_feature, LAR_thresholds, output_location, state_abbrev, county_name):
     ##
     ## LAR stands for Length(L) and Aspect Ratio(AR). This function
     ##  deletes points that do not conform with L or AR thresholds.
     ##
 
-    L_max_threshold =  thresholds [0][0]
-    L_min_threshold =  thresholds [0][1]
-    AR_max_threshold = thresholds [1][0]
-    AR_min_threshold = thresholds [1][1]
+    L_max_threshold =  LAR_thresholds [0][0]
+    L_min_threshold =  LAR_thresholds [0][1]
+    AR_max_threshold = LAR_thresholds [1][0]
+    AR_min_threshold = LAR_thresholds [1][1]
 
     outputName = 'LAR' + '_' + state_abbrev + '_' + county_name
     outputFilePath = os.path.join(output_location, outputName)
@@ -367,15 +372,13 @@ def masking(input_feature, output_location, state_abbrev, county_name, county_ou
     ##       [r'C:\alt_file_path\file2', #]]
     ##
 
-    ## Both neg_masks and pos_masks are default (empty), then simply pass the input_feature out of the function
+    ## If both neg_masks and pos_masks are default (empty), then simply pass the input_feature out of the function
     if neg_masks == [] and pos_masks == []:
         return input_feature
     
     county_name = nameFormat(county_name)
     outputName = 'Masking' + '_' + state_abbrev + '_' + county_name
     outputFilePath = os.path.join(output_location, outputName)
-    neg_masks = neg_masks
-    pos_masks = pos_masks
 
     if arcpy.Exists(outputFilePath):
         arcpy.Delete_management(outputFilePath)
@@ -654,7 +657,7 @@ if __name__ == '__main__':
             #          # 
             print "Applying Length/AspRatio thresholds for", state_name, county_name + "..."              
             try:
-                larFile = LAR(maskFile, thresholds, clusterGDB, state_abbrev, county_name)
+                larFile = LAR(maskFile, LAR_thresholds, clusterGDB, state_abbrev, county_name)
                 print "LAR thresholds applied. Script duration so far:", checkTime()
             except:
                 e = sys.exc_info()[1]
