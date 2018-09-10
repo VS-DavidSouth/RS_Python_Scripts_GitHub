@@ -51,8 +51,20 @@ runScriptAsTool = False ## This will overwrite any preset parameters by the ArcG
 
 saveIntermediates = True   # Change to false if you don't care about the intermediate files
 
+regional_35_counties = [
+     r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst\Alabama\BatchGDB_AL_Z16_c1.gdb',
+     r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst\Arkansas\BatchGDB_AR_Z15_c1.gdb',
+     r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst\Georgia\BatchGDB_GA_Z16_c1.gdb',
+     r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst\Georgia\BatchGDB_GA_Z17_c5.gdb',
+     r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst\Louisiana\BatchGDB_LA_Z15_c1.gdb',
+     r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst\Mississippi\BatchGDB_MS_Z16_c2.gdb',
+     r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst\North_Carolina\BatchGDB_NC_Z17_c1.gdb',
+     r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst\North_Carolina\BatchGDB_NC_Z18_c5.gdb',
+     r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst\Tennessee\BatchGDB_TN_Z16_c1.gdb',
+    ]
+
 clusterList = [
-     r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst\Alabama\BatchGDB_AL_Z16_c1.gdb'
+     r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst\Tennessee\BatchGDB_TN_Z16_c1.gdb',
     ] # A list of the file paths to all the relevant cluster GDBs. You can manually
       #  input entries if runScriptAsTool = False
 
@@ -80,11 +92,12 @@ prob_surface_threshold = 0.1   # Points with values < threshold will be deleted
 ## Note that buffer distance can be 0. Set = [] if no masks.
 neg_masks = [
              [r'N:\Geo_data\ESRI_Data\ESRI_Base_Data_2014\usa\census\urban.gdb\urban', 0],
-             [r'N:\Geo_data\ESRI_Data\ESRI_Base_Data_2014\usa\census\urban.gdb\urban', 0],
-             [r'N:\Geo_data\ESRI_Data\ESRI_Base_Data_2012\streetmap_na\data\streets.sdc\streets', 15],
+             [r'N:\Geo_data\ESRI_Data\ESRI_Base_Data_2012\usa\census\urban.sdc\urban', 0],
+             [r'N:\Geo_data\ESRI_Data\ESRI_Base_Data_2012\streetmap_na\data\streets.sdc\streets', 20],
              [r'N:\Geo_data\ESRI_Data\ESRI_Base_Data_2014\usa\hydro\dtl_wat.gdb\dtl_wat', 0],
              [r'N:\Geo_data\ESRI_Data\ESRI_Base_Data_2014\usa\hydro\dtl_riv.gdb\dtl_riv', 10],
             ]
+
 pos_masks = [
         
             ]
@@ -93,7 +106,7 @@ pos_masks = [
 ##  (which came from the Batch file). Any points outisde of these bounds
 ##  are deleted automatically. L values are in meters.
 L_max_threshold = 500   # Fill this with 99999 if you don't want to delete based on max Length
-L_min_threshold = 40   # Fill this with 0 if you don't want to delete based on min Length
+L_min_threshold = 50   # Fill this with 0 if you don't want to delete based on min Length
 AR_max_threshold = 99999   # Fill this with 99999 if you don't want to delete based on max AspRatio
 AR_min_threshold = 0  # Fill this with 0 if you don't want to delete based on min AspRatio
 
@@ -106,10 +119,10 @@ if runScriptAsTool == True:
     negative_buffer_dist = arcpy.GetParameterAsText(3) # Multivalue should be set to Yes and Type should be Optional
     positive_masks = arcpy.GetParameterAsText(4)       # Multivalue should be set to Yes and Type should be Optional
     positive_buffer_dist = arcpy.GetParameterAsText(5) # Multivalue should be set to Yes and Type should be Optional
-    L_max_threshold = arcpy.GetParameterAsText(6)  # Set default to 800
-    L_min_threshold = arcpy.GetParameterAsText(7)  # Set default to 35
-    AR_max_threshold = arcpy.GetParameterAsText(8) # Set defualt to 10
-    AR_min_threshold = arcpy.GetParameterAsText(9) # Set default to 1.3
+    L_max_threshold = arcpy.GetParameterAsText(6)   # Set default to 800
+    L_min_threshold = arcpy.GetParameterAsText(7)   # Set default to 35
+    AR_max_threshold = arcpy.GetParameterAsText(8)  # Set defualt to 10
+    AR_min_threshold = arcpy.GetParameterAsText(9)  # Set default to 1.3
     saveIntermediates = arcpy.GetparameterAsText(10)# Set default to True
 
     if not len(negative_masks) == len(negative_buffer_dist) and \
@@ -199,7 +212,7 @@ def findBatch(clusterGDB):
     ## This function finds all the point files in the target GDB
     ##  and returns them in the form of a list.
     ##
-    walkList = []   ## This will hold all of the file paths to the files wuithin the folder
+    walkList = []   ## This will hold all of the file paths to the files within the folder
 
     walk = arcpy.da.Walk(clusterGDB, type="Point")
 
@@ -668,7 +681,7 @@ if __name__ == '__main__':
             #           #
             #PROBSURFACE#
             #           # 
-            print "Applying probability surface for", state_name, county_name
+            print "Applying probability surface for", state_name, county_name + "..."
             try:
                 probSurfaceFile = probSurface(larFile, probSurfaceRaster, clusterGDB, state_abbrev, county_name)
                 print "Probability surface applied. Script duration so far:", checkTime()
@@ -681,7 +694,7 @@ if __name__ == '__main__':
             #          #
             #   C2P    #
             #          # 
-            print "Collapsing points for", state_name, county_name
+            print "Collapsing points for", state_name, county_name + "..."
             try:
                 collapsePointsFile = collapsePoints(probSurfaceFile, clusterGDB, state_abbrev, county_name)
                 print "Points collapsed. Script duration so far:", checkTime()
@@ -694,7 +707,7 @@ if __name__ == '__main__':
             #          #
             #PROJECTING#
             #          #                               
-            print "Projecting Automated Review for", state_name, county_name
+            print "Projecting Automated Review for", state_name, county_name + "..."
             try:
                 autoReviewFile = project(collapsePointsFile, UTM, clusterGDB, state_abbrev, county_name)
                 print "Projected. Script duration so far:", checkTime()
