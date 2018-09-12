@@ -19,7 +19,9 @@
 ##  for setting it up in ArcGIS will be included. Reference this URL:
 ##  http://desktop.arcgis.com/en/arcmap/10.3/analyze/creating-tools/adding-a-script-tool.htm
 ##
-
+## The Spatial Analyst ArcGIS extension is required for the ProbSurface portion
+##  of this script.
+##
 
 ############################
 ########## SETUP ###########
@@ -34,11 +36,7 @@ start_time = time.time()
 import arcpy
 arcpy.env.OverwriteOutput = True
 
-from Creating_TP_FN_FP_files import addRasterInfo, checkTime
-from Setting_up_counties_database import centralMeridian
-
 # this next import gives us access to two dictionaries for converting state names to abbreviations and vice versa
-sys.path.insert(0, r'O:\AI Modeling Coop Agreement 2017\David_working\Python') # it also gives us the nameFormat function which is very useful for name standardization
 from Converting_state_names_and_abreviations import *
 
 
@@ -52,6 +50,10 @@ runScriptAsTool = False ## This will overwrite any preset parameters by the ArcG
 saveIntermediates = True   # Change to false if you don't care about the intermediate files
 
 regional_35_counties = [
+    ## Note that these are only saved here for ease of use. The clusters that are
+    ##  going to be run are found in the clusterList, so if you want to run the
+    ##  clusters for all 35 counties from the Regional remote sensing project,
+    ##  then set clusterList = regional_35_counties.
      r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst\Alabama\BatchGDB_AL_Z16_c1.gdb',
      r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst\Arkansas\BatchGDB_AR_Z15_c1.gdb',
      r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst\Georgia\BatchGDB_GA_Z16_c1.gdb',
@@ -78,16 +80,17 @@ output_folder = r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst'
 
 prob_surface_threshold = 0.1   # Points with values < threshold will be deleted
 
-## Define if any masks will be used. If none, set these parameters = [].
+## It is important to define if the masks that will be used.
+## If you don't want any, set these parameters = [].
 ## The parameter neg_masks is where you would put feature classes which
 ##  exclude any farm premises for being there. An example would be water bodies.
 ## The parameter pos_masks is the opposite; farms cannot be placed outside of
 ##  these areas. An example would be public land boundaries.
 ## Both neg_masks (negative masks) and pos_masks (positive masks) should be
-##  formatted like this, with '#' representing the buffer distance in Meters:
+##  formatted like this, with '~' representing the buffer distance in Meters:
 ##          neg_mask =[
-##                     [r'C:\file_path\file', #],
-##                     [r'C:\alt_file_path\file2', #],
+##                     [r'C:\file_path\file', ~],
+##                     [r'C:\alt_file_path\file2', ~],
 ##                    ]
 ## Note that buffer distance can be 0. Set = [] if no masks.
 neg_masks = [
@@ -146,9 +149,10 @@ LAR_thresholds = [
 
     
 ############################
-#### NAMING CONVENTIONS ####
+#### DEFINE DICTIONARIES ###
 ############################
 
+## NAMING CONVENTIONS:
 ## Names for all files created in this script will follow the the same format.
 ##
 ##      [prefix]_[ST]_Z[##]_c[#]_[CountyName].[ext]
@@ -172,13 +176,23 @@ prefix_dict = {
     'BatchGDB': 'A file geodatabase that contains all the intermediate files for the creation of the Batch file',
     'BatchMXD': 'The ArcMap MXD file that was used to run Feature Analyst to create the Batch file',
     'Clip': 'Intermediate stage after creating Batch file, this is the Batch file clipped to the county',
-    'LAR': 'The Clip file but with points with Length or AspRatio values outside of the thresholds removed',
     'Mask': 'The LAR file but with points removed based on masking layers',
+    'LAR': 'The Clip file but with points with Length or AspRatio values outside of the thresholds removed',
     'ProbSurf': 'The Mask file but with values from the probability surface used to remove FPs',
     'Integrate': 'The ProbSurf file but points within 100m of each other are moved on top of one another at the centroid',
     'CollectEvents': 'Integrate file but with points on top of one another combined to a single point',
     'AutoReview': 'The final stage, which is the CollectEvents file but projected into NAD 1983',
     }
+
+centralMeridian = {10:'-123.0' , 11:'-117.0' , 12:'-111.0' , 13:'-105.0', \
+                   14:'-99.0'  , 15:'-93.0'  , 16:'-87.0'  , 17:'-81.0' , \
+                   18:'-75.0'  , 19:'-69.0',}
+    ##
+    ## Note: this dictionary is used to store the central meridian value for each UTM zone that
+    ## the contiguous USA is within (UTM 10-19). This wil be referenced in the following line.
+    ## This library is in the format of [UTM Zone]:[central meridian]. Values were found
+    ## at this site: http://www.jaworski.ca/utmzones.htm
+    ##
 
 
 ############################
@@ -503,7 +517,22 @@ def probSurface(input_point_data, raster_dataset, output_location, state_abbrev,
 
     arcpy.CopyFeatures_management (input_point_data, outputFilePath)
 
-    ## This next funciton comes from the creating_TF_FN_FP_files.py script
+    def addRasterInfo(point_data, raster_dataset, field_name_1='ProbSurf_1', field_name_2='ProbSurf_2'):
+        ##
+        ## This function extracts the values from the input raster
+        ##  raster and creates two new fields in the input feature class,
+        ##  called ProbSurf_1 and ProbSurf_2 respectively. 
+        ## ProbSurf_1 has no interpolation, ProbSurf_2 has
+        ##  bilinear interpolation.
+        ##
+        arcpy.CheckOutExtension("Spatial")  # this just allows the script to access the Spatial Analyst ArcGIS extension
+        
+        arcpy.sa.ExtractMultiValuesToPoints (point_data, [[raster_dataset, field_name_1]], "NONE")
+        arcpy.sa.ExtractMultiValuesToPoints (point_data, [[raster_dataset, field_name_2]], "BILINEAR")
+        
+        arcpy.CheckInExtension("Spatial") 
+
+    ## Now actually use the function we just defined
     addRasterInfo(outputFilePath, raster_dataset)
 
     ## Apply threshold - NOTE THIS WILL LIKELY BE CHANGED LATER

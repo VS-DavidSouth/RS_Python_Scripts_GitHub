@@ -19,7 +19,6 @@ start_time = time.time()
 
 import arcpy, os, sys
 
-sys.path.insert(0, r'O:\AI Modeling Coop Agreement 2017\David_working\Python') 
 from Converting_state_names_and_abreviations import *
     ## The above lines give us acccess to 3 useful things:
     ##      nameFormat(x) - a function that removes . and , and replaces - and [space] with _
