@@ -27,7 +27,7 @@
 ########## SETUP ###########
 ############################
 
-import os, sys
+import os, sys, csv, random
 import numpy as np
 
 import time
@@ -66,19 +66,23 @@ regional_35_counties = [
     ]
 
 clusterList = [
-     r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst\Tennessee\BatchGDB_TN_Z16_c1.gdb',
+     r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst\Alabama\BatchGDB_AL_Z16_c1.gdb',
     ] # A list of the file paths to all the relevant cluster GDBs. You can manually
       #  input entries if runScriptAsTool = False
 
 ## Location of probability surface raster
 probSurfaceRaster = r'N:\FLAPS from Chris Burdett\Data\poultry_prob_surface\poultryMskNrm\poultryMskNrm.tif'
 
+## Location of the folder that contains the county outline shapefiles
 county_outline_folder = r'N:\Remote Sensing Projects\2016 Cooperative Agreement Poultry Barns\Documents\Deliverables\Library\CountyOutlines'
+
+## Location of the adjusted NASS values CSV
+adjNASS_CSV = r'O:\AI Modeling Coop Agreement 2017\David_working\Remote_Sensing_Procedure\Simulated_Sampling_data\adjNASS_FINAL_CSV.csv'
 
 ## This folder should be the location where all the state folders are, which will each store the GDBs of the state clusters
 output_folder = r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst'
 
-prob_surface_threshold = 0.1   # Points with values < threshold will be deleted
+prob_surface_threshold = 0.1   # Points with values < or = threshold will be deleted
 
 ## It is important to define if the masks that will be used.
 ## If you don't want any, set these parameters = [].
@@ -175,13 +179,14 @@ prefix_dict = {
     'ModelMXD': 'The ArcMap MXD that was used to run Feature Analyst to create the Model',
     'BatchGDB': 'A file geodatabase that contains all the intermediate files for the creation of the Batch file',
     'BatchMXD': 'The ArcMap MXD file that was used to run Feature Analyst to create the Batch file',
-    'Clip': 'Intermediate stage after creating Batch file, this is the Batch file clipped to the county',
-    'Mask': 'The LAR file but with points removed based on masking layers',
-    'LAR': 'The Clip file but with points with Length or AspRatio values outside of the thresholds removed',
-    'ProbSurf': 'The Mask file but with values from the probability surface used to remove FPs',
-    'Integrate': 'The ProbSurf file but points within 100m of each other are moved on top of one another at the centroid',
-    'CollectEvents': 'Integrate file but with points on top of one another combined to a single point',
-    'AutoReview': 'The final stage, which is the CollectEvents file but projected into NAD 1983',
+    'Clip': 'The Batch file clipped to the county',
+    'Mask': 'The Clip file with points removed based on a series of masking layers',
+    'LAR': 'The Mask file with points removed based on Length or AspRatio values outside of the thresholds',
+    'ProbSurf': 'The LAR file with points removed according to a threshold value for the probablity surface',
+    'SimSampling': 'The ProbSurf file with points sorted into bins and many points removed to ensure each bin has the appropriate number of points, according to the Adjusted NASS values',
+    'Integrate': 'The SimSampling file but points within 100m of each other are moved on top of one another at the centroid; no points are removed',
+    'CollectEvents': 'Integrate file but with points on top of one another combined to a single point; no points are removed',
+    'AutoReview': 'The final stage, which is the CollectEvents file but projected into NAD 1983 with coordinate fields added',
     }
 
 centralMeridian = {10:'-123.0' , 11:'-117.0' , 12:'-111.0' , 13:'-105.0', \
@@ -243,75 +248,77 @@ def findBatch(clusterGDB):
     return state_abbrev, walkList
 
 
-def FIPS_UTM(county_file):
-    ##
-    ## This determines the appropriate UTM and FIPS code values for the county.
-    ##
-    with arcpy.da.SearchCursor(county_file, ['FIPS', 'UTM',]) as cursor:
-        for row in cursor:
-            return cursor[0], cursor[1]
-
-
-def add_FIPS_info(input_feature, state_abbrev, county_name):
-    ##
-    ## This adds the FIPS value (from the FIPS_UTM function) to a given shapefile
-    ##
-    
-    ## The following several lines are to check to see if the FIPS or FIPS2 fields exist
-    fieldList = [field.name for field in arcpy.ListFields(input_feature)] # Creates a list of all fields in that feature class
-
-    ## Checks if the fieldName is in the list that was just generated as fieldList
-    if "FIPS" in fieldList or "FIPS2" in fieldList:
-        print "File already has FIPS fields."
+def findFIPS_UTM(county_file):
+            ##
+            ## This determines the appropriate UTM and FIPS code values for the county.
+            ##
+            with arcpy.da.SearchCursor(county_file, ['FIPS', 'UTM',]) as cursor:
+                for row in cursor:
+                    return cursor[0], cursor[1]
         
-    else:
-        state_name = nameFormat(state_abbrev_to_name[state_abbrev])
-        
-        ## Location of county folder:
-        county_outline = os.path.join(county_outline_folder,
-                                          state_name + '.gdb',
-                                          county_name + 'Co' + state_abbrev + '_outline')
 
-        FIPS, UTM = FIPS_UTM(county_outline)
-        
-        ## Add a new field to store FIPS information. This field will hold the FIPS but remove leading zeroes
-        arcpy.AddField_management(in_table = input_feature, field_name = "FIPS", 
-                                  field_type = "LONG", field_precision = "", 
-                                  field_scale = "", field_length = "", field_alias = "", 
-                                  field_is_nullable = "NULLABLE", 
-                                  field_is_required = "NON_REQUIRED", field_domain = "")
+def addFipsInfo(input_feature, state_abbrev, county_name):
+        ##
+        ## This adds the FIPS value (from the findFIPS_UTM function) to a given shapefile
+        ##
 
-        ## Fill FIPS field with UTM info (DOES NOT FUNCTION PROPERLY)
-        #arcpy.CalculateField_management(in_table = input_feature, field = "FIPS", \
-        #                                expression = FIPS, \
-        #                                expression_type = "PYTHON_9.3", )
-        #                                #code_block = 'def fn(num):\n  if num <= %s:\n    return (1)\n  elif num > %s:\n    return (2)' %(collectEvents, collectEvents))
+        ## The following several lines are to check to see if the FIPS or FIPS2 fields exist
+        fieldList = [field.name for field in arcpy.ListFields(input_feature)] # Creates a list of all fields in that feature class
 
-        ## Fill newly created UTM field with the proper UTM
-        with arcpy.da.UpdateCursor(input_feature, ['FIPS']) as cursor_a:
-            for row in cursor_a:
-                row[0] = int(FIPS)
-                cursor_a.updateRow(row)
+        ## Checks if the fieldName is in the list that was just generated as fieldList
+        if "FIPS" in fieldList or "FIPS2" in fieldList:
+            print "File already has FIPS fields."
+            
+        else:
+            state_name = nameFormat(state_abbrev_to_name[state_abbrev])
+            
+            ## Location of county folder:
+            county_outline = os.path.join(county_outline_folder,
+                                              state_name + '.gdb',
+                                              county_name + 'Co' + state_abbrev + '_outline')
 
-        ## Add a second field to store FIPS information. This field will hold the
-        ##  FIPS as a string and will NOT remove leading zeroes
-        arcpy.AddField_management(in_table = input_feature, field_name = "FIPS2", 
-                                  field_type = "TEXT", field_precision = "", 
-                                  field_scale = "", field_length = "", field_alias = "", 
-                                  field_is_nullable = "NULLABLE", 
-                                  field_is_required = "NON_REQUIRED", field_domain = "")
 
-        ## Fill FIPS field with UTM info
-        #arcpy.CalculateField_management(in_table = input_feature, field = "FIPS2", \
-         #                               expression = FIPS, \
-          #                              expression_type = "PYTHON_9.3", )
-           #                             #code_block = 'def fn(num):\n  if num <= %s:\n    return (1)\n  elif num > %s:\n    return (2)' %(collectEvents, collectEvents))
+            FIPS, UTM = findFIPS_UTM(county_outline)
+            
+            ## Add a new field to store FIPS information. This field will hold the FIPS but remove leading zeroes
+            arcpy.AddField_management(in_table = input_feature, field_name = "FIPS", 
+                                      field_type = "LONG", field_precision = "", 
+                                      field_scale = "", field_length = "", field_alias = "", 
+                                      field_is_nullable = "NULLABLE", 
+                                      field_is_required = "NON_REQUIRED", field_domain = "")
 
-        ## Fill newly created UTM field with the proper UTM
-        with arcpy.da.UpdateCursor(input_feature, ['FIPS2']) as cursor_b:
-            for row in cursor_b:
-                row[0] = str(FIPS)
-                cursor_b.updateRow(row)
+            ## Fill FIPS field with UTM info (DOES NOT FUNCTION PROPERLY)
+            #arcpy.CalculateField_management(in_table = input_feature, field = "FIPS", \
+            #                                expression = FIPS, \
+            #                                expression_type = "PYTHON_9.3", )
+            #                                #code_block = 'def fn(num):\n  if num <= %s:\n    return (1)\n  elif num > %s:\n    return (2)' %(collectEvents, collectEvents))
+
+            ## Fill newly created UTM field with the proper UTM
+            with arcpy.da.UpdateCursor(input_feature, ['FIPS']) as cursor_a:
+                for row in cursor_a:
+                    row[0] = int(FIPS)
+                    cursor_a.updateRow(row)
+
+            ## Add a second field to store FIPS information. This field will hold the
+            ##  FIPS as a string and will NOT remove leading zeroes
+            arcpy.AddField_management(in_table = input_feature, field_name = "FIPS2", 
+                                      field_type = "TEXT", field_precision = "", 
+                                      field_scale = "", field_length = "", field_alias = "", 
+                                      field_is_nullable = "NULLABLE", 
+                                      field_is_required = "NON_REQUIRED", field_domain = "")
+
+            ## Fill FIPS field with UTM info
+            #arcpy.CalculateField_management(in_table = input_feature, field = "FIPS2", \
+             #                               expression = FIPS, \
+              #                              expression_type = "PYTHON_9.3", )
+               #                             #code_block = 'def fn(num):\n  if num <= %s:\n    return (1)\n  elif num > %s:\n    return (2)' %(collectEvents, collectEvents))
+
+            ## Fill newly created UTM field with the proper UTM
+            with arcpy.da.UpdateCursor(input_feature, ['FIPS2']) as cursor_b:
+                for row in cursor_b:
+                    row[0] = str(FIPS)
+                    cursor_b.updateRow(row)
+
 
 
 def clip(input_feature, clip_files, output_location, state_abbrev, county_name):
@@ -319,7 +326,8 @@ def clip(input_feature, clip_files, output_location, state_abbrev, county_name):
     ## This function clips the input features and names everything properly,
     ##  as well as adding FIPS information.
     ##
-    
+
+
     ## Get rid of any weird characters in the county name
     county_name = nameFormat(county_name)
     
@@ -327,22 +335,25 @@ def clip(input_feature, clip_files, output_location, state_abbrev, county_name):
     outputName = 'Clip_' + state_abbrev + '_' + county_name
     outputFilePath = os.path.join(output_location, outputName)
 
+    if arcpy.Exists(outputFilePath):
+        arcpy.Delete_management(outputFilePath)
+
     ## Do the clip
     arcpy.Clip_analysis(in_features = input_feature, 
                         clip_features = clip_files, 
                         out_feature_class = outputFilePath, 
                         cluster_tolerance = "")
 
-    add_FIPS_info(outputFilePath, state_abbrev, county_name)
+    addFipsInfo(outputFilePath, state_abbrev, county_name)
                                     
     ## Add the old file to the list of intermediate files
-    if __name__ == '__main__':
+    try:
         intermed_list.append(input_feature)
-
-    return outputFilePath
+    finally:
+        return outputFilePath
 
     
-def LAR(input_feature, LAR_thresholds, output_location, state_abbrev, county_name):
+def LAR(input_feature, output_location, LAR_thresholds, state_abbrev, county_name):
     ##
     ## LAR stands for Length(L) and Aspect Ratio(AR). This function
     ##  deletes points that do not conform with L or AR thresholds.
@@ -353,8 +364,14 @@ def LAR(input_feature, LAR_thresholds, output_location, state_abbrev, county_nam
     AR_max_threshold = LAR_thresholds [1][0]
     AR_min_threshold = LAR_thresholds [1][1]
 
+    ## Get rid of any weird characters in the county name
+    county_name = nameFormat(county_name)
+
     outputName = 'LAR' + '_' + state_abbrev + '_' + county_name
     outputFilePath = os.path.join(output_location, outputName)
+
+    if arcpy.Exists(outputFilePath):
+        arcpy.Delete_management(outputFilePath)
 
     arcpy.CopyFeatures_management (input_feature, outputFilePath)
 
@@ -380,10 +397,10 @@ def LAR(input_feature, LAR_thresholds, output_location, state_abbrev, county_nam
                 deleteCursor.deleteRow()
 
     ## Add the old file to the list of intermediate files
-    if __name__ == '__main__':
+    try:
         intermed_list.append(input_feature)
-        
-    return outputFilePath
+    finally:
+        return outputFilePath
 
     
 def masking(input_feature, output_location, state_abbrev, county_name, county_outline, neg_masks=[], pos_masks=[] ):
@@ -410,14 +427,17 @@ def masking(input_feature, output_location, state_abbrev, county_name, county_ou
     if arcpy.Exists(outputFilePath):
         arcpy.Delete_management(outputFilePath)
 
-    def clip_buffer(mask):
+    def clip_buffer(mask, temp_location, county_outline):
         ##
         ## This function is a small thing to clip the mask file to the county
         ##  to chop it into a manageable size. The file is buffered if required.
         ##  This function is used for each mask. This mini-function is not for
         ##  clipping or erasing the point file input data.
         ##
-        clip_temp = os.path.join(output_location,'clipped_mask_temp') # Where the temporary clipped file will be stored
+        clip_temp = os.path.join(temp_location,'clipped_mask_temp') ## Where the temporary clipped file will be stored
+
+        if arcpy.Exists(clip_temp):
+            arcpy.Delete_management(clip_temp)
 
         ## Create a temporary clipped file of the mask
         arcpy.Clip_analysis(in_features = mask[0], 
@@ -425,9 +445,10 @@ def masking(input_feature, output_location, state_abbrev, county_name, county_ou
                         out_feature_class = clip_temp, 
                         cluster_tolerance = "")
         
-        buff_temp = os.path.join(output_location, 'buffer_mask_temp') # Where the temporary buffer file will be stored
+        buff_temp = os.path.join(temp_location, 'buffer_mask_temp') ## Where the temporary buffer file will be stored
 
-        if mask[1] > 0: # If there is a buffer value specified:
+        if mask[1] > 0:
+            ## If there is a buffer value specified:
             ## Create a temporary buffer around the clipped file, but only if the buffer distance is >0
             arcpy.Buffer_analysis(in_features = clip_temp, 
                             out_feature_class = buff_temp, 
@@ -446,35 +467,37 @@ def masking(input_feature, output_location, state_abbrev, county_name, county_ou
     ##  be set as the current temporary file that is created during the process.
     ##  This ensures that each time that points are removed, they are removed
     ##  from the most recent version of the file so that the end result will
-    ##  be the cumulative result of all the masks at once.
+    ##  be the cumulative result of all the masks at once. Note the original file
+    ##  will not be modified, new temporary files will be made every step.
     fileToRemovePointsFrom = input_feature
 
     for maskType in ('neg', 'pos'): # Do this whole thing for both positive and negative masks
-        count = 0 # Start the count, this will be used to name temporary files
+        count = 0 ## Start the count, this will be used to name temporary files
         currentFile = ''
 
         if maskType == 'neg':
             masksList = neg_masks
-            tempMaskFilePath = 'in_memory/neg_mask'
         elif maskType == 'pos':
             masksList = pos_masks
-            tempMaskFilePath = 'in_memory/pos_mask'
-
+        
         if not masksList == []:
             for mask in masksList:
                 count +=1
-                tempMaskFile = clip_buffer(mask)
+                tempMaskFile = clip_buffer(mask, 'in_memory', county_outline)
 
-                if ( pos_masks == [] and count == len(neg_masks) ) \
-                   or count == len(pos_masks):
+                if count == len(neg_masks) + len(pos_masks):
                     currentFile = outputFilePath
                     ## This is basically saying that if this is the final mask that needs
                     ##  to be applied, then don't make a temporary file, use the actual
                     ##  output file name.
                     
                 else:
-                    currentFile = tempMaskFilePath + str(count)
+                    currentFile = os.path.join('in_memory', 'temp_applied_mask_' + str(count))
 
+                if arcpy.Exists(currentFile):
+                    arcpy.Delete_management(currentFile) ## Sometimes when errors happen previous versions are
+                                                         ##  left over and need to be deleted before the next time 'round.
+                
                 if maskType == 'neg' and not neg_masks == []:
                     arcpy.Erase_analysis(in_features = fileToRemovePointsFrom, \
                                          erase_features = tempMaskFile, \
@@ -485,7 +508,7 @@ def masking(input_feature, output_location, state_abbrev, county_name, county_ou
                                         clip_features = tempMaskFile, 
                                         out_feature_class = currentFile)
 
-                arcpy.Delete_management(tempMaskFile) # Get rid of the masking file, we don't need it
+                arcpy.Delete_management(tempMaskFile) ## Get rid of the masking file, we don't need it
 
                 if arcpy.Exists(currentFile[:-1] + str(count - 1)):
                     arcpy.Delete_management(currentFile[:-1] + str(count - 1))
@@ -498,10 +521,10 @@ def masking(input_feature, output_location, state_abbrev, county_name, county_ou
                     ##  the changes are present in a single file.
 
     ## Add the old file to the list of intermediate files
-    if __name__ == '__main__':
+    try:
         intermed_list.append(input_feature)
-        
-    return outputFilePath
+    finally:
+        return outputFilePath
 
 def probSurface(input_point_data, raster_dataset, output_location, state_abbrev, county_name):
     ##
@@ -515,6 +538,9 @@ def probSurface(input_point_data, raster_dataset, output_location, state_abbrev,
     outputName = 'ProbSurf_' + state_abbrev + '_' + county_name
     outputFilePath = os.path.join(output_location, outputName)
 
+    if arcpy.Exists(outputFilePath):
+        arcpy.Delete_management(outputFilePath)
+
     arcpy.CopyFeatures_management (input_point_data, outputFilePath)
 
     def addRasterInfo(point_data, raster_dataset, field_name_1='ProbSurf_1', field_name_2='ProbSurf_2'):
@@ -522,10 +548,10 @@ def probSurface(input_point_data, raster_dataset, output_location, state_abbrev,
         ## This function extracts the values from the input raster
         ##  raster and creates two new fields in the input feature class,
         ##  called ProbSurf_1 and ProbSurf_2 respectively. 
-        ## ProbSurf_1 has no interpolation, ProbSurf_2 has
+        ##  ProbSurf_1 has no interpolation, ProbSurf_2 has
         ##  bilinear interpolation.
         ##
-        arcpy.CheckOutExtension("Spatial")  # this just allows the script to access the Spatial Analyst ArcGIS extension
+        arcpy.CheckOutExtension("Spatial")  ## this just allows the script to access the Spatial Analyst ArcGIS extension
         
         arcpy.sa.ExtractMultiValuesToPoints (point_data, [[raster_dataset, field_name_1]], "NONE")
         arcpy.sa.ExtractMultiValuesToPoints (point_data, [[raster_dataset, field_name_2]], "BILINEAR")
@@ -535,18 +561,180 @@ def probSurface(input_point_data, raster_dataset, output_location, state_abbrev,
     ## Now actually use the function we just defined
     addRasterInfo(outputFilePath, raster_dataset)
 
-    ## Apply threshold - NOTE THIS WILL LIKELY BE CHANGED LATER
+    ## Apply threshold
     with arcpy.da.UpdateCursor(outputFilePath, "ProbSurf_1") as cursor:
         for row in cursor:
-            if row[0] < prob_surface_threshold:
+            if row[0] <= prob_surface_threshold:
                 cursor.deleteRow()
 
     ## Add the old file to the list of intermediate files
-    intermed_list.append(input_point_data)
+    try:
+        intermed_list.append(input_point_data)
+    finally:
+        return outputFilePath
 
-    return outputFilePath
+def simulatedSampling(input_point_data, output_location, state_abbrev, county_name, ssBins='default' ):
+    ##
+    ## This function randomly forces the data into a probability distribution
+    ##  curve similar to the probabilty distribution found in the 'truth' data.
+    ##  It constructs several 'bins' which are based on the probSurf_1 fields
+    ##  of the input_point_data file, then deletes all but the specified number
+    ##  points from that bin. 
+    ## Note that this function assumes that prob_surface_threshold = 0.1 as default.
+    ##
 
-        
+    ## Get rid of any weird characters in the state and county name
+    county_name = nameFormat(county_name)
+    state_name = nameFormat(state_abbrev_to_name[state_abbrev])
+
+    outputName = 'SimSampling_' + state_abbrev + '_' + county_name
+    outputFilePath = os.path.join(output_location, outputName)
+
+    if arcpy.Exists(outputFilePath):
+        arcpy.Delete_management(outputFilePath)
+    
+    ## Create a new file with all points. This function will delete most of the points later on.
+    arcpy.CopyFeatures_management (input_point_data, outputFilePath)
+
+    #                                     #
+    ### SETUP TO READ FROM adjNASS file ###
+    #                                     #
+    def readAdjNASS(adjNASS_CSV):
+        ##
+        ## This funtion reads the adjNASS_CSV file and returns the adjusted NASS value.
+        ##
+        with open(adjNASS_CSV) as csvfile:
+            reader = csv.reader(csvfile, delimiter=',')
+            for row in reader:
+                ## If the row matches the state and county, save the ptot_ALL field value
+                ##  as adjNASS, the total number of poultry in the county.
+                if row[1] == state_name.upper() and row[2] == county_name.upper():
+                    adjNASS = row[16]
+                    
+                    return adjNASS
+                
+                ## If there are no values in the 2nd or 3rd column, check the 12th column.
+                elif row[1] == '' and row[2] == '':
+                    tempIndex = row[11].find('\\') ## Note that \\ is used instead of \, this is because \ has special meaning
+                                                   ##  in Python so you must use \\ to represent \. In this case, \ is the divider
+                                                   ##  between the state name and county name in column 12 (index 11) in the CSV.
+                    tempStateName = row[11][:tempIndex]
+                    tempCountyName = row[11][tempIndex+1:]  ## These two temp names are basically the value in column 12 (index 11)
+                                                            ##  sliced with the \ as the dividing line.
+                    if tempStateName == state_name and tempCountyName == county_name:
+                        adjNASS = row[16]
+                        
+                        tempIndex, tempStateName, tempCountyName = '' ## Reset the temp variables so you don't get them mixed up.
+
+                        return adjNASS
+                    
+    adjNASS = readAdjNASS(adjNASS_CSV)
+
+    #                #
+    ### SETUP BINS ###
+    #                #
+    ## Note that ssBins stands for simulated sampling bins.
+    if ssBins == 'default' and prob_surface_threshold == 0.1:
+        ssBins = ( ## Column 1 is the numeric label for each bin.
+                   ##  Columns 2 and 3 are the lower and upper values for
+                   ##  that particular bin, respectively. Column 4 is the
+                   ##  percentage of points that should be selected from
+                   ##  that bin. Column 5 will be filled later with the
+                   ##  number of points that should actually be drawn from that bin.
+                  (1, 0.1, 0.2, 3.88 ),
+                  (2, 0.2, 0.3, 7.69 ),
+                  (3, 0.3, 0.4, 11.95),
+                  (4, 0.4, 0.5, 19.64),
+                  (5, 0.5, 0.6, 23.34),
+                  (6, 0.6, 0.7, 20.09),
+                  (7, 0.7, 0.8, 11.08),
+                  (8, 0.8, 0.9, 2.23 ),
+                  (9, 0.9, 1.0, 0.09 ),
+                  )
+    elif ssBins == 'default' and not prob_surface_threshold == 0.1:
+        raise Exception("Error: please provide ssBins values that fit with a prob_surface_threshold of %s" %str(prob_surface_threshold) )
+
+    ## Change ssBins to a numpy array.
+    ssBins = np.array(ssBins)
+    
+    ## Add column 5 to array, then fill it with
+    ##  the proper number of points to draw from that bin, calculated as
+    ##  column 3 percentage times adjNASS total for that county.
+    ssBins = np.insert(ssBins, 4, np.zeros(len(ssBins)), axis=1) ## create column 4 (index 3) and fill it with meaningless zeros
+    for row in ssBins:
+        ## Now actually fill column 5 with a rounded number of points to draw from that bin.
+        row[4] = round( float(row[3])/100. * float(adjNASS), 0)
+
+    if not round(sum(ssBins[:,3]),1) == 100.0:
+        ## If the percentages don't total to really close to 100%, raise hell
+        raise Exception("Error: please provide ssBins values that total to 100 percent")
+
+
+    ## Add a new field to the input data to hold the bin information in
+    arcpy.AddField_management(in_table = outputFilePath, field_name = "Bin", 
+                          field_type = "SHORT", field_precision = "", 
+                          field_scale = "", field_length = "", field_alias = "", 
+                          field_is_nullable = "NULLABLE", 
+                          field_is_required = "NON_REQUIRED", field_domain = "")
+    
+    with arcpy.da.UpdateCursor(outputFilePath, ['OBJECTID', 'ProbSurf_1', 'Bin',]) as cursor:
+        for row in cursor:
+            ProbSurf_1 = row[1]
+            
+            for binThresholds in ssBins:
+                ## Classify the point based on which of the bin max and min categories that it fits within
+                if ProbSurf_1 > binThresholds[1] and ProbSurf_1 <= binThresholds[2]:
+                    ## Assign the Bin field based on what range the ProbSurf_1 field fits in.
+                    row[2] = int(binThresholds[0])
+                    cursor.updateRow(row)
+                    break
+                
+    #                           #                      
+    ### DRAW POINTS FROM BINS ###
+    #                           #
+    selectedPoints = [] ## This will be used to collect all the points that will be in the output.
+                
+    for specificBin in ssBins:
+        ## Create a list that contains the pool of points for that bin that we will draw random points out of
+        pointsPool = []
+
+        with arcpy.da.SearchCursor(outputFilePath, ['OBJECTID', 'ProbSurf_1', 'Bin',]) as cursor2:
+            for row2 in cursor2:
+                ## Check to see if the point matches the current bin label,
+                ##  if so, add it to pointsPool so it can be drawn out later.
+                if row2[2] == specificBin[0]:
+                    pointsPool.append(row2)
+                    
+        ## Randomly select (from the pointsPool list) a number of points equal to the value in the
+        ##  5th column (index 4) of ssBins.
+        try:
+            selectedPoints.append(random.sample(pointsPool, specificBin[4]) )
+        ## If there are too few points in that pool, select them all instead of taking some random points.
+        except ValueError:
+            selectedPoints.append(pointsPool)
+
+    ## Create a list of just the OBJECTID values, which will be used to delete points.
+    selectedOIDs = []
+    for bn in selectedPoints:
+        for pointInfo in bn:
+            OID = pointInfo[0]
+            selectedOIDs.append(OID)
+
+    with arcpy.da.UpdateCursor(outputFilePath, ['OBJECTID', 'ProbSurf_1', 'Bin',]) as cursor3:
+        for row3 in cursor3:
+            ## Check to see if the OBJECTID is in the OBJECTID section of the
+            ##  selectedPoints list, otherwise it gets deleted.
+            if row3[0] not in selectedOIDs:
+                    cursor3.deleteRow()
+                
+    #             #
+    ### CLEANUP ###
+    #             #
+    try:
+        intermed_list.append(input_point_data)
+    finally:
+        return outputFilePath
+    
 def collapsePoints(input_point_data, output_location, state_abbrev, county_name):
     ##
     ## This function creates a new file and uses the Integrate and CollectEvents
@@ -555,7 +743,8 @@ def collapsePoints(input_point_data, output_location, state_abbrev, county_name)
     ##  file paths having spaces in them. It will cause vague errors if there
     ##  are spaces or special characters in the filepaths. Don't do it.
     ##
-
+    
+    ## Get rid of any weird characters in the county name
     county_name = nameFormat(county_name)
     state_name = nameFormat(state_abbrev_to_name[state_abbrev])
 
@@ -568,6 +757,8 @@ def collapsePoints(input_point_data, output_location, state_abbrev, county_name)
 
     if arcpy.Exists(integrateOutputFilePath):
         arcpy.Delete_management(integrateOutputFilePath)
+    if arcpy.Exists(collectEventsOutputFilePath):
+        arcpy.Delete_management(collectEventsOutputFilePath)
         
     arcpy.CopyFeatures_management (input_point_data, integrateOutputFilePath)
 
@@ -578,26 +769,31 @@ def collapsePoints(input_point_data, output_location, state_abbrev, county_name)
     arcpy.CollectEvents_stats(Input_Incident_Features = integrateOutputFilePath, \
                               Output_Weighted_Point_Feature_Class = collectEventsOutputFilePath)
 
-    add_FIPS_info(collectEventsOutputFilePath, state_abbrev, county_name)
+    addFipsInfo(collectEventsOutputFilePath, state_abbrev, county_name)
 
     ## Add the old file to the list of intermediate files
-    intermed_list.append(input_point_data)
-    intermed_list.append(integrateOutputFilePath)
+    try:
+        intermed_list.append(input_point_data)
+        intermed_list.append(integrateOutputFilePath)
+    finally:
+        return collectEventsOutputFilePath
 
-    return collectEventsOutputFilePath
 
-
-def project(input_data, UTM_code, output_location, state_abbrev, county_name):
+def project(input_data, output_location, UTM_code, state_abbrev, county_name):
     ##
     ## This function projects the input from the UTM county projection into
     ##  WGS 1984 Geographic Coordinate System.
     ##
 
+    ## Get rid of any weird characters in the county name
     county_name = nameFormat(county_name)
 
     outputName = 'AutoReview_' + state_abbrev + '_' + county_name
     outputFilePath = os.path.join(output_location, outputName)
 
+    if arcpy.Exists(outputFilePath):
+        arcpy.Delete_management(outputFilePath)
+        
     meridian = centralMeridian[int(UTM_code)] ## centralMeridian is a dictionary found in Setting_up_counties_database.py
                                               ##  and specifies the central meridian for the projection
     
@@ -614,14 +810,15 @@ def project(input_data, UTM_code, output_location, state_abbrev, county_name):
     arcpy.AddXY_management(outputFilePath)
 
     ## Add the old file to the list of intermediate files
-    intermed_list.append(input_data)
-
-    return outputFilePath
+    try:
+        intermed_list.append(input_data)
+    finally:
+        return outputFilePath
 
 
 def deleteIntermediates(intermed_list):
     ##
-    ## This function is designed to be used in the other functions
+    ##e This function is designed to be used in the other functions
     ##  whenever they have any intermediate files. It will delete
     ##  all files that are in list format in the intermed_list
     ##  input. (intermed is short for intermediate)
@@ -662,7 +859,7 @@ if __name__ == '__main__':
             county_outline = os.path.join(county_outline_folder,
                                           state_name + '.gdb',
                                           county_name + 'Co' + state_abbrev + '_outline')
-            FIPS, UTM = FIPS_UTM(county_outline)
+            FIPS, UTM = findFIPS_UTM(county_outline)
 
             #          #
             # CLIPPING #
@@ -699,7 +896,7 @@ if __name__ == '__main__':
             #          # 
             print "Applying Length/AspRatio thresholds for", state_name, county_name + "..."              
             try:
-                larFile = LAR(maskFile, LAR_thresholds, clusterGDB, state_abbrev, county_name)
+                larFile = LAR(maskFile, clusterGDB, LAR_thresholds, state_abbrev, county_name)
                 print "LAR thresholds applied. Script duration so far:", checkTime()
             except:
                 e = sys.exc_info()[1]
@@ -710,22 +907,38 @@ if __name__ == '__main__':
             #           #
             #PROBSURFACE#
             #           # 
-            print "Applying probability surface for", state_name, county_name + "..."
+            print "Applying probability surface threshold for", state_name, county_name + "..."
             try:
                 probSurfaceFile = probSurface(larFile, probSurfaceRaster, clusterGDB, state_abbrev, county_name)
-                print "Probability surface applied. Script duration so far:", checkTime()
+                print "Probability surface threshold applied. Script duration so far:", checkTime()
             except:
                 e = sys.exc_info()[1]
                 print(e.args[0])
                 errors.append(['ProbSurf', state_abbrev, county_name, e.args[0] ])
-                
+
 
             #          #
-            #   C2P    #
-            #          # 
+            #SIMULATED #
+            # SAMPLING #    
+            #          #
+            print "Preforming Simulated Sampling protocol for", state_name, county_name + "..."
+            try:
+                simSamplingFile = simulatedSampling(probSurfaceFile, clusterGDB, state_abbrev, county_name, ssBins='default' )
+                print "Simulated Sampling completed. Script duration so far:", checkTime()
+            except:
+                e = sys.exc_info()[1]
+                print(e.args[0])
+                errors.append(['SimSampling', state_abbrev, county_name, e.args[0] ])
+
+
+            
+            #               #
+            #COLLAPSE POINTS#
+            #               #
+            ## Note: This creates two intermediate files, Integrate and CollectEvents
             print "Collapsing points for", state_name, county_name + "..."
             try:
-                collapsePointsFile = collapsePoints(probSurfaceFile, clusterGDB, state_abbrev, county_name)
+                collapsePointsFile = collapsePoints(simSamplingFile, clusterGDB, state_abbrev, county_name)
                 print "Points collapsed. Script duration so far:", checkTime()
             except:
                 e = sys.exc_info()[1]
@@ -738,7 +951,7 @@ if __name__ == '__main__':
             #          #                               
             print "Projecting Automated Review for", state_name, county_name + "..."
             try:
-                autoReviewFile = project(collapsePointsFile, UTM, clusterGDB, state_abbrev, county_name)
+                autoReviewFile = project(collapsePointsFile, clusterGDB,  UTM, state_abbrev, county_name)
                 print "Projected. Script duration so far:", checkTime()
             except:
                 e = sys.exc_info()[1]
