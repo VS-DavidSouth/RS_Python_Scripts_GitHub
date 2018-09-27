@@ -36,7 +36,8 @@ start_time = time.time()
 import arcpy
 arcpy.env.OverwriteOutput = True
 
-# this next import gives us access to two dictionaries for converting state names to abbreviations and vice versa
+## This next import gives us access to two dictionaries for
+##  converting state names to abbreviations and vice versa
 from Converting_state_names_and_abreviations import *
 
 
@@ -65,13 +66,15 @@ regional_35_counties = [
      r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst\Tennessee\BatchGDB_TN_Z16_c1.gdb',
     ]
 
-clusterList = [
-     r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst\Alabama\BatchGDB_AL_Z16_c1.gdb',
-    ] # A list of the file paths to all the relevant cluster GDBs. You can manually
+clusterList = regional_35_counties
+    #[
+    #r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst\Alabama\BatchGDB_AL_Z16_c1.gdb',
+    #] # A list of the file paths to all the relevant cluster GDBs. You can manually
       #  input entries if runScriptAsTool = False
 
 ## Location of probability surface raster
-probSurfaceRaster = r'N:\FLAPS from Chris Burdett\Data\poultry_prob_surface\poultryMskNrm\poultryMskNrm.tif'
+prob_surface_raster = r'N:\FLAPS from Chris Burdett\Data\poultry_prob_surface\poultryMskNrm\poultryMskNrm.tif'
+prob_surface_threshold = 0.1   # Points with values < or = threshold will be deleted
 
 ## Location of the folder that contains the county outline shapefiles
 county_outline_folder = r'N:\Remote Sensing Projects\2016 Cooperative Agreement Poultry Barns\Documents\Deliverables\Library\CountyOutlines'
@@ -82,7 +85,7 @@ adjNASS_CSV = r'O:\AI Modeling Coop Agreement 2017\David_working\Remote_Sensing_
 ## This folder should be the location where all the state folders are, which will each store the GDBs of the state clusters
 output_folder = r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst'
 
-prob_surface_threshold = 0.1   # Points with values < or = threshold will be deleted
+
 
 ## It is important to define if the masks that will be used.
 ## If you don't want any, set these parameters = [].
@@ -117,6 +120,9 @@ L_min_threshold = 50   # Fill this with 0 if you don't want to delete based on m
 AR_max_threshold = 99999   # Fill this with 99999 if you don't want to delete based on max AspRatio
 AR_min_threshold = 0  # Fill this with 0 if you don't want to delete based on min AspRatio
 
+numIterations = 1 # Any number >1 will result in several iterations of simualtedSampling,
+                  #  meaining several projected AutoReview files will be created, each with a unique name.
+
 ## Overwrite certain parameters set above, if this tool is run as a custom
 ##  ArcGIS Python tool. The values will be determined by the user.
 if runScriptAsTool == True:
@@ -130,7 +136,8 @@ if runScriptAsTool == True:
     L_min_threshold = arcpy.GetParameterAsText(7)   # Set default to 35
     AR_max_threshold = arcpy.GetParameterAsText(8)  # Set defualt to 10
     AR_min_threshold = arcpy.GetParameterAsText(9)  # Set default to 1.3
-    saveIntermediates = arcpy.GetparameterAsText(10)# Set default to True
+    saveIntermediates = arcpy.GetParameterAsText(10)# Set default to True
+    numIterations = arcpy.GetParameterAsText(11)    # Set default to 1
 
     if not len(negative_masks) == len(negative_buffer_dist) and \
        not len(positive_masks) == len(positive_buffer_dist):
@@ -526,6 +533,21 @@ def masking(input_feature, output_location, state_abbrev, county_name, county_ou
     finally:
         return outputFilePath
 
+def addRasterInfo(point_data_to_alter, raster_dataset, field_name_1='ProbSurf_1', field_name_2='ProbSurf_2'):
+    ##
+    ## This function extracts the values from the input raster
+    ##  raster and creates two new fields in the input feature class,
+    ##  called ProbSurf_1 and ProbSurf_2 respectively. ProbSurf_1 has
+    ##  no interpolation, ProbSurf_2 has bilinear interpolation.
+    ## Note: THIS FUNCTION CHANGES THE INPUT FEATURE CLASS BY ADDING FIELDS.
+    ##
+    arcpy.CheckOutExtension("Spatial")  ## This just allows the script to access the Spatial Analyst ArcGIS extension
+    
+    arcpy.sa.ExtractMultiValuesToPoints (point_data_to_alter, [[raster_dataset, field_name_1]], "NONE")
+    arcpy.sa.ExtractMultiValuesToPoints (point_data_to_alter, [[raster_dataset, field_name_2]], "BILINEAR")
+    
+    arcpy.CheckInExtension("Spatial") 
+
 def probSurface(input_point_data, raster_dataset, output_location, state_abbrev, county_name):
     ##
     ## This function exists to replace the Manual Review step of the regional
@@ -543,22 +565,7 @@ def probSurface(input_point_data, raster_dataset, output_location, state_abbrev,
 
     arcpy.CopyFeatures_management (input_point_data, outputFilePath)
 
-    def addRasterInfo(point_data, raster_dataset, field_name_1='ProbSurf_1', field_name_2='ProbSurf_2'):
-        ##
-        ## This function extracts the values from the input raster
-        ##  raster and creates two new fields in the input feature class,
-        ##  called ProbSurf_1 and ProbSurf_2 respectively. 
-        ##  ProbSurf_1 has no interpolation, ProbSurf_2 has
-        ##  bilinear interpolation.
-        ##
-        arcpy.CheckOutExtension("Spatial")  ## this just allows the script to access the Spatial Analyst ArcGIS extension
-        
-        arcpy.sa.ExtractMultiValuesToPoints (point_data, [[raster_dataset, field_name_1]], "NONE")
-        arcpy.sa.ExtractMultiValuesToPoints (point_data, [[raster_dataset, field_name_2]], "BILINEAR")
-        
-        arcpy.CheckInExtension("Spatial") 
-
-    ## Now actually use the function we just defined
+    ## Call addRasterInfo over to do some stuff for us
     addRasterInfo(outputFilePath, raster_dataset)
 
     ## Apply threshold
@@ -573,21 +580,74 @@ def probSurface(input_point_data, raster_dataset, output_location, state_abbrev,
     finally:
         return outputFilePath
 
-def simulatedSampling(input_point_data, output_location, state_abbrev, county_name, ssBins='default' ):
+
+def collapsePoints(input_point_data, output_location, state_abbrev, county_name):
+    ##
+    ## This function creates a new file and uses the Integrate and CollectEvents
+    ##  ArcGIS tools to collapse input points within 100m of each other to
+    ##  single points. Note: The Integrate tool is really finiky about the
+    ##  file paths having spaces in them. It will cause vague errors if there
+    ##  are spaces or special characters in the filepaths. Don't do it.
+    ##
+    
+    ## Get rid of any weird characters in the county name
+    county_name = nameFormat(county_name)
+    state_name = nameFormat(state_abbrev_to_name[state_abbrev])
+
+    ## Set up names and FilePaths for the Ingetrate and CollectEvents files
+    integrateOutputName = 'Integrate_' + state_abbrev + '_' + county_name
+
+    integrateOutputFilePath = os.path.join(output_location, integrateOutputName)
+    collectEventsOutputName = 'CollectEvents' + '_' + state_abbrev + '_' + county_name
+    collectEventsOutputFilePath = os.path.join(output_location, collectEventsOutputName)
+
+    if arcpy.Exists(integrateOutputFilePath):
+        arcpy.Delete_management(integrateOutputFilePath)
+    if arcpy.Exists(collectEventsOutputFilePath):
+        arcpy.Delete_management(collectEventsOutputFilePath)
+        
+    arcpy.CopyFeatures_management (input_point_data, integrateOutputFilePath)
+
+    ## The input file path to the Integrate tool NEEDS to have no spaces in it, otherwise it will cause errors
+    arcpy.Integrate_management(in_features = integrateOutputFilePath, cluster_tolerance = "100 Meters")
+
+    ## Collapse points that are on top of eachother to single points
+    arcpy.CollectEvents_stats(Input_Incident_Features = integrateOutputFilePath, \
+                              Output_Weighted_Point_Feature_Class = collectEventsOutputFilePath)
+
+    addFipsInfo(collectEventsOutputFilePath, state_abbrev, county_name)
+
+    ## Add the old file to the list of intermediate files
+    try:
+        intermed_list.append(input_point_data)
+        intermed_list.append(integrateOutputFilePath)
+    finally:
+        return collectEventsOutputFilePath
+
+def simulatedSampling(input_point_data, raster_dataset, output_location, state_abbrev, county_name,
+                      ssBins='default', iteration=None, random_seed=None):
     ##
     ## This function randomly forces the data into a probability distribution
     ##  curve similar to the probabilty distribution found in the 'truth' data.
     ##  It constructs several 'bins' which are based on the probSurf_1 fields
     ##  of the input_point_data file, then deletes all but the specified number
-    ##  points from that bin. 
+    ##  points from that bin. Ensure that the 'raster_dataset' used here
+    ##  is the same as was used for the probSurface function.
     ## Note that this function assumes that prob_surface_threshold = 0.1 as default.
-    ##
+    ## This function requires county_name to be UNFORMATTED, otherwise it will return
+    ##  'None' for those counties.
 
     ## Get rid of any weird characters in the state and county name
+    #county_name_unformatted = county_name
     county_name = nameFormat(county_name)
+    #state_name_unformatted = state_abbrev_to_name[state_abbrev]
     state_name = nameFormat(state_abbrev_to_name[state_abbrev])
 
-    outputName = 'SimSampling_' + state_abbrev + '_' + county_name
+    if iteration == None:
+        outputName = 'SimSampling_' + state_abbrev + '_' + county_name
+    else:
+        ## If an iteration is specified, put that in the name. The 'i' stands for 'iteration'.
+        outputName = 'SimSampling_' + state_abbrev + '_' + county_name + '_i' + str(iteration)
     outputFilePath = os.path.join(output_location, outputName)
 
     if arcpy.Exists(outputFilePath):
@@ -595,6 +655,10 @@ def simulatedSampling(input_point_data, output_location, state_abbrev, county_na
     
     ## Create a new file with all points. This function will delete most of the points later on.
     arcpy.CopyFeatures_management (input_point_data, outputFilePath)
+
+    ## Since the collapsePoints function has eraised existing fields, we need to re-add
+    ##  the ProbSurf_1 and ProbSurf_2 fields. 
+    addRasterInfo(outputFilePath, raster_dataset, field_name_1='ProbSurf_1', field_name_2='ProbSurf_2')
 
     #                                     #
     ### SETUP TO READ FROM adjNASS file ###
@@ -609,7 +673,8 @@ def simulatedSampling(input_point_data, output_location, state_abbrev, county_na
                 ## If the row matches the state and county, save the ptot_ALL field value
                 ##  as adjNASS, the total number of poultry in the county.
                 if row[1] == state_name.upper() and row[2] == county_name.upper():
-                    adjNASS = row[16]
+                    adjNASS = row[8] ## BE SURE TO DOUBLE CHECK THAT IT IS READING
+                                     ##  THE RIGHT COLUMN! This could cause many errors.
                     
                     return adjNASS
                 
@@ -618,9 +683,11 @@ def simulatedSampling(input_point_data, output_location, state_abbrev, county_na
                     tempIndex = row[11].find('\\') ## Note that \\ is used instead of \, this is because \ has special meaning
                                                    ##  in Python so you must use \\ to represent \. In this case, \ is the divider
                                                    ##  between the state name and county name in column 12 (index 11) in the CSV.
-                    tempStateName = row[11][:tempIndex]
-                    tempCountyName = row[11][tempIndex+1:]  ## These two temp names are basically the value in column 12 (index 11)
-                                                            ##  sliced with the \ as the dividing line.
+                    tempStateName = nameFormat(row[11][:tempIndex])
+                    tempCountyName = nameFormat(row[11][tempIndex+1:])
+                        ## These two temp names are basically the value in column 12 (index 11)
+                        ##  sliced with the \ as the dividing line.
+                    
                     if tempStateName == state_name and tempCountyName == county_name:
                         adjNASS = row[16]
                         
@@ -629,6 +696,7 @@ def simulatedSampling(input_point_data, output_location, state_abbrev, county_na
                         return adjNASS
                     
     adjNASS = readAdjNASS(adjNASS_CSV)
+    print "----Total number of points to select:", adjNASS ## REMOVE THIS LATER
 
     #                #
     ### SETUP BINS ###
@@ -664,6 +732,7 @@ def simulatedSampling(input_point_data, output_location, state_abbrev, county_na
     for row in ssBins:
         ## Now actually fill column 5 with a rounded number of points to draw from that bin.
         row[4] = round( float(row[3])/100. * float(adjNASS), 0)
+        print '----' + str(int(row[0])),'points:', str(row[4])
 
     if not round(sum(ssBins[:,3]),1) == 100.0:
         ## If the percentages don't total to really close to 100%, raise hell
@@ -708,9 +777,12 @@ def simulatedSampling(input_point_data, output_location, state_abbrev, county_na
         ## Randomly select (from the pointsPool list) a number of points equal to the value in the
         ##  5th column (index 4) of ssBins.
         try:
-            selectedPoints.append(random.sample(pointsPool, specificBin[4]) )
+            if not random_seed == None:
+                random.seed(random_seed)
+            selectedPoints.append(random.sample(pointsPool, int(specificBin[4])) )
         ## If there are too few points in that pool, select them all instead of taking some random points.
         except ValueError:
+            print "Welp, guess we gotta take all the points for category", int(specificBin[0]) ## REMOVE THIS LATER
             selectedPoints.append(pointsPool)
 
     ## Create a list of just the OBJECTID values, which will be used to delete points.
@@ -719,7 +791,7 @@ def simulatedSampling(input_point_data, output_location, state_abbrev, county_na
         for pointInfo in bn:
             OID = pointInfo[0]
             selectedOIDs.append(OID)
-
+    
     with arcpy.da.UpdateCursor(outputFilePath, ['OBJECTID', 'ProbSurf_1', 'Bin',]) as cursor3:
         for row3 in cursor3:
             ## Check to see if the OBJECTID is in the OBJECTID section of the
@@ -735,51 +807,8 @@ def simulatedSampling(input_point_data, output_location, state_abbrev, county_na
     finally:
         return outputFilePath
     
-def collapsePoints(input_point_data, output_location, state_abbrev, county_name):
-    ##
-    ## This function creates a new file and uses the Integrate and CollectEvents
-    ##  ArcGIS tools to collapse input points within 100m of each other to
-    ##  single points. Note: The Integrate tool is really finiky about the
-    ##  file paths having spaces in them. It will cause vague errors if there
-    ##  are spaces or special characters in the filepaths. Don't do it.
-    ##
-    
-    ## Get rid of any weird characters in the county name
-    county_name = nameFormat(county_name)
-    state_name = nameFormat(state_abbrev_to_name[state_abbrev])
 
-    ## Set up names and FilePaths for the Ingetrate and CollectEvents files
-    integrateOutputName = 'Integrate_' + state_abbrev + '_' + county_name
-
-    integrateOutputFilePath = os.path.join(output_location, integrateOutputName)
-    collectEventsOutputName = 'CollectEvents' + '_' + state_abbrev + '_' + county_name
-    collectEventsOutputFilePath = os.path.join(output_location, collectEventsOutputName)
-
-    if arcpy.Exists(integrateOutputFilePath):
-        arcpy.Delete_management(integrateOutputFilePath)
-    if arcpy.Exists(collectEventsOutputFilePath):
-        arcpy.Delete_management(collectEventsOutputFilePath)
-        
-    arcpy.CopyFeatures_management (input_point_data, integrateOutputFilePath)
-
-    ## The input file path to the Integrate tool NEEDS to have no spaces in it, otherwise it will cause errors
-    arcpy.Integrate_management(in_features = integrateOutputFilePath, cluster_tolerance = "100 Meters")
-
-    ## Collapse points that are on top of eachother to single points
-    arcpy.CollectEvents_stats(Input_Incident_Features = integrateOutputFilePath, \
-                              Output_Weighted_Point_Feature_Class = collectEventsOutputFilePath)
-
-    addFipsInfo(collectEventsOutputFilePath, state_abbrev, county_name)
-
-    ## Add the old file to the list of intermediate files
-    try:
-        intermed_list.append(input_point_data)
-        intermed_list.append(integrateOutputFilePath)
-    finally:
-        return collectEventsOutputFilePath
-
-
-def project(input_data, output_location, UTM_code, state_abbrev, county_name):
+def project(input_data, output_location, UTM_code, state_abbrev, county_name, iteration=None):
     ##
     ## This function projects the input from the UTM county projection into
     ##  WGS 1984 Geographic Coordinate System.
@@ -788,7 +817,10 @@ def project(input_data, output_location, UTM_code, state_abbrev, county_name):
     ## Get rid of any weird characters in the county name
     county_name = nameFormat(county_name)
 
-    outputName = 'AutoReview_' + state_abbrev + '_' + county_name
+    if iteration = None:
+        outputName = 'AutoReview_' + state_abbrev + '_' + county_name
+    else:
+        outputName = 'AutoReview_' + state_abbrev + '_' + county_name + '_i' + str(iteration) 
     outputFilePath = os.path.join(output_location, outputName)
 
     if arcpy.Exists(outputFilePath):
@@ -880,7 +912,8 @@ if __name__ == '__main__':
             print "Applying Masks for", state_name, county_name + "..."
             if not (neg_masks == [] and pos_masks == []):
                 try:
-                    maskFile = masking(clipFile, clusterGDB, state_abbrev, county_name, county_outline, neg_masks, pos_masks)
+                    maskFile = masking(clipFile, clusterGDB, state_abbrev, county_name, county_outline,
+                                       neg_masks, pos_masks)
                     print "Mask applied. Script duration so far:", checkTime()
                 except:
                     e = sys.exc_info()[1]
@@ -909,27 +942,12 @@ if __name__ == '__main__':
             #           # 
             print "Applying probability surface threshold for", state_name, county_name + "..."
             try:
-                probSurfaceFile = probSurface(larFile, probSurfaceRaster, clusterGDB, state_abbrev, county_name)
+                probSurfaceFile = probSurface(larFile, prob_surface_raster, clusterGDB, state_abbrev, county_name)
                 print "Probability surface threshold applied. Script duration so far:", checkTime()
             except:
                 e = sys.exc_info()[1]
                 print(e.args[0])
                 errors.append(['ProbSurf', state_abbrev, county_name, e.args[0] ])
-
-
-            #          #
-            #SIMULATED #
-            # SAMPLING #    
-            #          #
-            print "Preforming Simulated Sampling protocol for", state_name, county_name + "..."
-            try:
-                simSamplingFile = simulatedSampling(probSurfaceFile, clusterGDB, state_abbrev, county_name, ssBins='default' )
-                print "Simulated Sampling completed. Script duration so far:", checkTime()
-            except:
-                e = sys.exc_info()[1]
-                print(e.args[0])
-                errors.append(['SimSampling', state_abbrev, county_name, e.args[0] ])
-
 
             
             #               #
@@ -938,43 +956,68 @@ if __name__ == '__main__':
             ## Note: This creates two intermediate files, Integrate and CollectEvents
             print "Collapsing points for", state_name, county_name + "..."
             try:
-                collapsePointsFile = collapsePoints(simSamplingFile, clusterGDB, state_abbrev, county_name)
+                collapsePointsFile = collapsePoints(probSurfaceFile, clusterGDB, state_abbrev, county_name)
                 print "Points collapsed. Script duration so far:", checkTime()
             except:
                 e = sys.exc_info()[1]
                 print(e.args[0])
                 errors.append(['Integrate or CollectEvents', state_abbrev, county_name, e.args[0] ])
                 
+             ## Note: this sets up a loop, running 
+            for eachIteration in range(1, numIterations+1):
+                if numIterations <=1:
+                    iterationNumber = None
+                else:
+                    iterationNumber = eachIteration
 
-            #          #
-            #PROJECTING#
-            #          #                               
-            print "Projecting Automated Review for", state_name, county_name + "..."
-            try:
-                autoReviewFile = project(collapsePointsFile, clusterGDB,  UTM, state_abbrev, county_name)
-                print "Projected. Script duration so far:", checkTime()
-            except:
-                e = sys.exc_info()[1]
-                print(e.args[0])
-                errors.append(['AutoReview', state_abbrev, county_name, e.args[0] ])
-                
+                #          #
+                #SIMULATED #
+                # SAMPLING #    
+                #          #
+                print "Preforming Simulated Sampling protocol for", state_name, county_name + "..."
+                try:
+                    simSamplingFile = simulatedSampling(collapsePointsFile, prob_surface_raster, clusterGDB,
+                                                        state_abbrev, county_name, ssBins='default',
+                                                        iteration=iterationNumber)
+                    print "Simulated Sampling completed. Script duration so far:", checkTime()
+                except:
+                    e = sys.exc_info()[1]
+                    print(e.args[0])
+                    errors.append(['SimSampling', state_abbrev, county_name, e.args[0] ])
+
+                               
+                #          #
+                #PROJECTING#
+                #          #                               
+                print "Projecting Automated Review for", state_name, county_name + "..."
+                try:
+                    autoReviewFile = project(simSamplingFile, clusterGDB,  UTM, state_abbrev, county_name,
+                                             iteration=iterationNumber)
+                    print "Projected. Script duration so far:", checkTime()
+                except:
+                    e = sys.exc_info()[1]
+                    print(e.args[0])
+                    errors.append(['AutoReview', state_abbrev, county_name, e.args[0] ])
+
+            ## Just before you go on to the next county, now is the time to delete unwanted intermediate files.        
             if saveIntermediates == False:
                 deleteIntermediates(intermed_list)
                 
 
             print '' # This just puts a blank line between each county
-            
 
+            
+    ############################
+    ######### CLEANUP ##########
+    ############################
+            
+    ## Once all clusters are done, print a readout:
     if errors == []:
         print "\n\nNo counties had any errors!"
     else:
         print "\n\nThe following counties had errors:"
         for row in errors:
             print row[0], row[1], row[2]
-
-    ############################
-    ######### CLEANUP ##########
-    ############################
     
     print "---------------------\nSCRIPT COMPLETE!"
     print "The script took a total of", checkTime() + "."
