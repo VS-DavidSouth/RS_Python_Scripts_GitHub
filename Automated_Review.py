@@ -49,6 +49,9 @@ runScriptAsTool = False ## This will overwrite any preset parameters by the ArcG
                         ## Note that this is untested and may require some alteraetions.
 
 saveIntermediates = True   # Change to false if you don't care about the intermediate files
+trackWhichCountiesAreCompleted = True # Change to false if you don't want the script
+                                      #  to keep track of the completed counties by
+                                      #  editing a specified CSV.
 
 regional_35_counties = [
     ## Note that these are only saved here for ease of use. The clusters that are
@@ -68,7 +71,10 @@ regional_35_counties = [
 
 clusterList = regional_35_counties
     #[
-    #r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst\Alabama\BatchGDB_AL_Z16_c1.gdb',
+     #r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst\Mississippi\BatchGDB_MS_Z16_c2.gdb',
+     #r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst\North_Carolina\BatchGDB_NC_Z17_c1.gdb',
+     #r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst\North_Carolina\BatchGDB_NC_Z18_c5.gdb',
+     #r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst\Tennessee\BatchGDB_TN_Z16_c1.gdb',
     #] # A list of the file paths to all the relevant cluster GDBs. You can manually
       #  input entries if runScriptAsTool = False
 
@@ -80,7 +86,9 @@ prob_surface_threshold = 0.1   # Points with values < or = threshold will be del
 county_outline_folder = r'N:\Remote Sensing Projects\2016 Cooperative Agreement Poultry Barns\Documents\Deliverables\Library\CountyOutlines'
 
 ## Location of the adjusted NASS values CSV
-adjNASS_CSV = r'O:\AI Modeling Coop Agreement 2017\David_working\Remote_Sensing_Procedure\Simulated_Sampling_data\adjNASS_FINAL_CSV.csv'
+adjNASS_CSV = r'R:\Nat_Hybrid_Poultry\Documents\adjNASS_FINAL_CSV.csv'
+
+progress_tracking_file = r'R:\Nat_Hybrid_Poultry\Documents\trackingFileCSV.csv'
 
 ## This folder should be the location where all the state folders are, which will each store the GDBs of the state clusters
 output_folder = r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst'
@@ -120,8 +128,19 @@ L_min_threshold = 50   # Fill this with 0 if you don't want to delete based on m
 AR_max_threshold = 99999   # Fill this with 99999 if you don't want to delete based on max AspRatio
 AR_min_threshold = 0  # Fill this with 0 if you don't want to delete based on min AspRatio
 
-numIterations = 1 # Any number >1 will result in several iterations of simualtedSampling,
+numIterations = 10 # Any number >1 will result in several iterations of simualtedSampling,
                   #  meaining several projected AutoReview files will be created, each with a unique name.
+
+## If steps have been completed before, there may be no need to repeat them because
+##  there will simply output the exact same result. If that is the case for all
+##  clusters this script will run, those steps to this list.append  They will be skipped. 
+skipList = [    ## Note this functionality is not added yet. This was left in case
+                ##  this function gets developed later.
+                ## NOTE TO SELF: It would probably be easiest to simply add in a
+                ##  'skip' argument of True or False to each major function. Then
+                ##  when skip=True you simply have it return the output file path
+                ##  before it actually does any geoprocessing.
+            ]
 
 ## Overwrite certain parameters set above, if this tool is run as a custom
 ##  ArcGIS Python tool. The values will be determined by the user.
@@ -171,7 +190,7 @@ LAR_thresholds = [
 ## Some files will not have Z[##], c[#], or [CountyName].
 ##
 ##      [prefix] -> a unique identifier for each type of file, below is a dictionary explaining each prefix
-##      [ST] -> the state abbreviation
+##      [ST] -> the 2-letter state abbreviation
 ##      Z[##] -> the UTM zone number
 ##      c[#] -> the cluster number
 ##      [CountyName] -> the specific county name
@@ -179,7 +198,7 @@ LAR_thresholds = [
 ##
 
 prefix_dict = {
-    'NAIP': 'downloaded 1m resolution NAIP areal imagery',
+    'NAIP': 'Downloaded 1m resolution NAIP areal imagery',
     'NAIP2m': '2m resampled NAIP imagery',
     'Model': 'AFE file that is used to create the Batch files for a particular state',
     'ModelGDB': 'The file geodatabase that was used to create the Model for that state',
@@ -190,9 +209,9 @@ prefix_dict = {
     'Mask': 'The Clip file with points removed based on a series of masking layers',
     'LAR': 'The Mask file with points removed based on Length or AspRatio values outside of the thresholds',
     'ProbSurf': 'The LAR file with points removed according to a threshold value for the probablity surface',
-    'SimSampling': 'The ProbSurf file with points sorted into bins and many points removed to ensure each bin has the appropriate number of points, according to the Adjusted NASS values',
-    'Integrate': 'The SimSampling file but points within 100m of each other are moved on top of one another at the centroid; no points are removed',
-    'CollectEvents': 'Integrate file but with points on top of one another combined to a single point; no points are removed',
+    'Integrate': 'The ProbSurf file with points within 100m of each other are moved on top of one another at the centroid; no points are removed',
+    'CollectEvents': 'Integrate file with points on top of one another combined to a single point',
+    'SimSampling': 'The CollectEvents file with points sorted into bins and many points removed to ensure each bin has the appropriate number of points, according to the Adjusted NASS values',
     'AutoReview': 'The final stage, which is the CollectEvents file but projected into NAD 1983 with coordinate fields added',
     }
 
@@ -214,7 +233,7 @@ centralMeridian = {10:'-123.0' , 11:'-117.0' , 12:'-111.0' , 13:'-105.0', \
     ##
     ## Note: when a function has several arguments, they should generally
     ##  go in the following order (if a parameter is not needed, skip it):
-    ##      (input_file, critical_inputs, output_location, state_abbrev, \
+    ##      (main_input_file, other_inputs, output_location, state_abbrev, \
     ##       county_name, {optional_parameters})
     ##
 
@@ -643,15 +662,30 @@ def simulatedSampling(input_point_data, raster_dataset, output_location, state_a
     #state_name_unformatted = state_abbrev_to_name[state_abbrev]
     state_name = nameFormat(state_abbrev_to_name[state_abbrev])
 
-    if iteration == None:
-        outputName = 'SimSampling_' + state_abbrev + '_' + county_name
-    else:
+    ## This next part gets a little hairy. Basically it is just deleting
+    ##  any previously run SimSampling outputs, for all iterations and for
+    ##  runs that were done without iterations. It also deletes all
+    ##  AutoReview iterations as well, while it's at it. It starts by
+    ##  naming the output, then it might add on the iteration suffix if
+    ##  the file is part of a series of iterations.
+    outputName = 'SimSampling_' + state_abbrev + '_' + county_name
+    outputFilePath = os.path.join(output_location, outputName)
+    if arcpy.Exists(outputFilePath):
+        arcpy.Delete_management(outputFilePath) ## Delete any files without '_i#'
+    if iteration == 1 or iteration == None:
+        walk = arcpy.da.Walk(output_location, type="Point")
+        for dirpath, dirnames, filenames in walk:
+            for filename in filenames:
+                if 'AutoReview' in filename or 'SimSampling' in filename:
+                    if '_i' in filename:
+                        arcpy.Delete_management(os.path.join(dirpath, filename))
+                        print 'deleted:', os.path.join(dirpath, filename) ## REMOVE THIS LATER
+                                    ## Delete all files with '_i#' suffix.
+    if not iteration == None:
         ## If an iteration is specified, put that in the name. The 'i' stands for 'iteration'.
         outputName = 'SimSampling_' + state_abbrev + '_' + county_name + '_i' + str(iteration)
-    outputFilePath = os.path.join(output_location, outputName)
+        outputFilePath = os.path.join(output_location, outputName)
 
-    if arcpy.Exists(outputFilePath):
-        arcpy.Delete_management(outputFilePath)
     
     ## Create a new file with all points. This function will delete most of the points later on.
     arcpy.CopyFeatures_management (input_point_data, outputFilePath)
@@ -661,7 +695,7 @@ def simulatedSampling(input_point_data, raster_dataset, output_location, state_a
     addRasterInfo(outputFilePath, raster_dataset, field_name_1='ProbSurf_1', field_name_2='ProbSurf_2')
 
     #                                     #
-    ### SETUP TO READ FROM adjNASS file ###
+    ### SETUP TO READ FROM adjNASS FILE ###
     #                                     #
     def readAdjNASS(adjNASS_CSV):
         ##
@@ -670,9 +704,12 @@ def simulatedSampling(input_point_data, raster_dataset, output_location, state_a
         with open(adjNASS_CSV) as csvfile:
             reader = csv.reader(csvfile, delimiter=',')
             for row in reader:
-                ## If the row matches the state and county, save the ptot_ALL field value
-                ##  as adjNASS, the total number of poultry in the county.
-                if row[1] == state_name.upper() and row[2] == county_name.upper():
+                ## If the row matches the state and county (once they have been
+                ##  formatted and capitalized properly), save the adjNASS field
+                ##  value as the adjNASS variable, which is returned out of the
+                ##  function.
+                if nameFormat(row[1]).title() == state_name.title() \
+                and nameFormat(row[2]).title() == county_name.title():
                     adjNASS = row[8] ## BE SURE TO DOUBLE CHECK THAT IT IS READING
                                      ##  THE RIGHT COLUMN! This could cause many errors.
                     
@@ -683,15 +720,15 @@ def simulatedSampling(input_point_data, raster_dataset, output_location, state_a
                     tempIndex = row[11].find('\\') ## Note that \\ is used instead of \, this is because \ has special meaning
                                                    ##  in Python so you must use \\ to represent \. In this case, \ is the divider
                                                    ##  between the state name and county name in column 12 (index 11) in the CSV.
-                    tempStateName = nameFormat(row[11][:tempIndex])
-                    tempCountyName = nameFormat(row[11][tempIndex+1:])
+                    tempStateName = nameFormat(row[11][:tempIndex]).title()
+                    tempCountyName = nameFormat(row[11][tempIndex+1:]).title()
                         ## These two temp names are basically the value in column 12 (index 11)
                         ##  sliced with the \ as the dividing line.
                     
-                    if tempStateName == state_name and tempCountyName == county_name:
+                    if tempStateName == state_name.title() and tempCountyName == county_name.title():
                         adjNASS = row[16]
                         
-                        tempIndex, tempStateName, tempCountyName = '' ## Reset the temp variables so you don't get them mixed up.
+                        del tempIndex, tempStateName, tempCountyName ## Reset the temp variables so you don't get them mixed up.
 
                         return adjNASS
                     
@@ -817,7 +854,7 @@ def project(input_data, output_location, UTM_code, state_abbrev, county_name, it
     ## Get rid of any weird characters in the county name
     county_name = nameFormat(county_name)
 
-    if iteration = None:
+    if iteration == None:
         outputName = 'AutoReview_' + state_abbrev + '_' + county_name
     else:
         outputName = 'AutoReview_' + state_abbrev + '_' + county_name + '_i' + str(iteration) 
@@ -846,6 +883,28 @@ def project(input_data, output_location, UTM_code, state_abbrev, county_name, it
         intermed_list.append(input_data)
     finally:
         return outputFilePath
+
+
+def markCountyAsCompleted(clusterGDB, progress_tracking_file, state_abbrev, county_name):
+##
+## This function edits a CSV and fills in which counties have been
+##  completed so far.
+##
+    
+    state_name = nameFormat(state_abbrev_to_name[state_abbrev])
+    county_name = nameFormat(county_name)
+
+    timeValue = str( int( round(time.time(), 0) ) )
+    
+    #if not os.path.exists(filePath):
+     #   code = 'wb'
+    #else:
+     #   code = 'ab'
+
+    with open(progress_tracking_file, 'ab') as g:
+        writer = csv.writer(g, dialect = 'excel') 
+        writer.writerow([state_name, county_name])
+        
 
 
 def deleteIntermediates(intermed_list):
@@ -879,8 +938,10 @@ if __name__ == '__main__':
         for countyBatch in batchList:
 
             ## Reset the file parameters, so that if there are errors they are not used again
-            clipFile = larFile = maskFile = collapsePointsFile = autoReviewFile = ''
-
+            try:
+                del clipFile, larFile, maskFile, collapsePointsFile, autoReviewFile
+            except: ()
+            
             intermed_list = []  # this will be filled later with the FilePaths to all the intermediate
                                 #  files, which may or may not be deleted depending on whether
                                 #  saveIntermediates is True or False
@@ -984,7 +1045,8 @@ if __name__ == '__main__':
                     e = sys.exc_info()[1]
                     print(e.args[0])
                     errors.append(['SimSampling', state_abbrev, county_name, e.args[0] ])
-
+                    del simSamplingFile
+                    
                                
                 #          #
                 #PROJECTING#
@@ -993,6 +1055,8 @@ if __name__ == '__main__':
                 try:
                     autoReviewFile = project(simSamplingFile, clusterGDB,  UTM, state_abbrev, county_name,
                                              iteration=iterationNumber)
+                    if trackWhichCountiesAreCompleted == True:
+                        markCountyAsCompleted(clusterGDB, progress_tracking_file, state_abbrev, county_name)
                     print "Projected. Script duration so far:", checkTime()
                 except:
                     e = sys.exc_info()[1]
