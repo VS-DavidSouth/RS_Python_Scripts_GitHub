@@ -134,12 +134,26 @@ numIterations = 10 # Any number >1 will result in several iterations of simualte
 ## If steps have been completed before, there may be no need to repeat them because
 ##  there will simply output the exact same result. If that is the case for all
 ##  clusters this script will run, those steps to this list.append  They will be skipped. 
-skipList = [    ## Note this functionality is not added yet. This was left in case
-                ##  this function gets developed later.
-                ## NOTE TO SELF: It would probably be easiest to simply add in a
+skipList = [    ## NOTE TO SELF: It would probably be easiest to simply add in a
                 ##  'skip' argument of True or False to each major function. Then
                 ##  when skip=True you simply have it return the output file path
                 ##  before it actually does any geoprocessing.
+            ## 1st column, put the state abbreviation in CAPS as a string.
+            ## 2nd column, put county name as a string.
+            ## 3rd column, put either 'Clip', 'Mask', 'LAR', 'ProbSurf',
+            ##  'CollectEvents', 'SimSampling' or 'all'. The latter indicates
+            ##  that no geoprocesses should be done for that file, since it is
+            ##  already completed.
+    
+            ['AL', 'Barbour',  'all'],
+            ['AL', 'Blount',   'all'],
+            ['AL', 'Bullock',  'all'],
+            ['AL', 'Coffee',   'all'],
+            ['AL', 'Cullman',  'all'],
+            ['AL', 'DeKalb',   'all'],
+            ['AL', 'Geneva',   'all'],
+            ['AL', 'Madison',  'all'],
+            ['AL', 'Marshall', 'all'],
             ]
 
 ## Overwrite certain parameters set above, if this tool is run as a custom
@@ -251,6 +265,21 @@ def checkTime():
     else:
         return str(round( timeSoFar / 60. , 1)) + " hours"
 
+def shouldThisStepBeSkipped(state_abbrev, county_name, step_name):
+    ##
+    ## This function returns either True or False, based on whether
+    ##  the specified county is in skipList.
+    ##
+    county_name_unformat = nameFormat(county_name)
+    for county in skipList:
+        if state_abbrev == county[0]:
+            if nameFormat(county_name) == nameFormat(county[1]):
+                if county[2].lower() == 'all' \
+                or step_name.lower() == county[2].lower():
+                    return True
+    ## If it isn't in the skipList, just return false
+    return False
+
 
 def findBatch(clusterGDB):
     ##
@@ -347,7 +376,8 @@ def addFipsInfo(input_feature, state_abbrev, county_name):
 
 
 
-def clip(input_feature, clip_files, output_location, state_abbrev, county_name):
+def clip(input_feature, clip_files, output_location, state_abbrev,
+         county_name):
     ##
     ## This function clips the input features and names everything properly,
     ##  as well as adding FIPS information.
@@ -361,8 +391,13 @@ def clip(input_feature, clip_files, output_location, state_abbrev, county_name):
     outputName = 'Clip_' + state_abbrev + '_' + county_name
     outputFilePath = os.path.join(output_location, outputName)
 
-    if arcpy.Exists(outputFilePath):
-        arcpy.Delete_management(outputFilePath)
+    if arcpy.Exists(outputFilePath) == True:
+        print "IT EXISTS!"
+        if shouldThisStepBeSkipped(state_abbrev, county_name, 'Clip') == True:
+            print "Clip skipped."
+            return outputFilePath
+        else:
+            arcpy.Delete_management(outputFilePath)
 
     ## Do the clip
     arcpy.Clip_analysis(in_features = input_feature, 
@@ -379,7 +414,8 @@ def clip(input_feature, clip_files, output_location, state_abbrev, county_name):
         return outputFilePath
 
     
-def LAR(input_feature, output_location, LAR_thresholds, state_abbrev, county_name):
+def LAR(input_feature, output_location, LAR_thresholds, state_abbrev,
+        county_name):
     ##
     ## LAR stands for Length(L) and Aspect Ratio(AR). This function
     ##  deletes points that do not conform with L or AR thresholds.
@@ -396,8 +432,12 @@ def LAR(input_feature, output_location, LAR_thresholds, state_abbrev, county_nam
     outputName = 'LAR' + '_' + state_abbrev + '_' + county_name
     outputFilePath = os.path.join(output_location, outputName)
 
-    if arcpy.Exists(outputFilePath):
-        arcpy.Delete_management(outputFilePath)
+    if arcpy.Exists(outputFilePath) == True:
+        if shouldThisStepBeSkipped(state_abbrev, county_name, 'LAR') == True:
+            print "LAR skipped."
+            return outputFilePath
+        else:
+            arcpy.Delete_management(outputFilePath)
 
     arcpy.CopyFeatures_management (input_feature, outputFilePath)
 
@@ -429,7 +469,8 @@ def LAR(input_feature, output_location, LAR_thresholds, state_abbrev, county_nam
         return outputFilePath
 
     
-def masking(input_feature, output_location, state_abbrev, county_name, county_outline, neg_masks=[], pos_masks=[] ):
+def masking(input_feature, output_location, state_abbrev, county_name,
+            county_outline, neg_masks=[], pos_masks=[]):
     ##
     ## This function uses the Erase tool to remove any points with a set distance
     ##  of the files in the neg_masks list. It also uses the Clip tool to
@@ -450,8 +491,12 @@ def masking(input_feature, output_location, state_abbrev, county_name, county_ou
     outputName = 'Masking' + '_' + state_abbrev + '_' + county_name
     outputFilePath = os.path.join(output_location, outputName)
 
-    if arcpy.Exists(outputFilePath):
-        arcpy.Delete_management(outputFilePath)
+    if arcpy.Exists(outputFilePath) == True:
+        if shouldThisStepBeSkipped(state_abbrev, county_name, 'Masking') == True:
+            print "Masking skipped."
+            return outputFilePath
+        else:
+            arcpy.Delete_management(outputFilePath)
 
     def clip_buffer(mask, temp_location, county_outline):
         ##
@@ -552,7 +597,8 @@ def masking(input_feature, output_location, state_abbrev, county_name, county_ou
     finally:
         return outputFilePath
 
-def addRasterInfo(point_data_to_alter, raster_dataset, field_name_1='ProbSurf_1', field_name_2='ProbSurf_2'):
+def addRasterInfo(point_data_to_alter, raster_dataset, field_name_1='ProbSurf_1',
+                  field_name_2='ProbSurf_2'):
     ##
     ## This function extracts the values from the input raster
     ##  raster and creates two new fields in the input feature class,
@@ -567,7 +613,8 @@ def addRasterInfo(point_data_to_alter, raster_dataset, field_name_1='ProbSurf_1'
     
     arcpy.CheckInExtension("Spatial") 
 
-def probSurface(input_point_data, raster_dataset, output_location, state_abbrev, county_name):
+def probSurface(input_point_data, raster_dataset, output_location,
+                state_abbrev, county_name):
     ##
     ## This function exists to replace the Manual Review step of the regional
     ##  remote sensing procedure. It uses the FLAPS probability surface to
@@ -579,8 +626,12 @@ def probSurface(input_point_data, raster_dataset, output_location, state_abbrev,
     outputName = 'ProbSurf_' + state_abbrev + '_' + county_name
     outputFilePath = os.path.join(output_location, outputName)
 
-    if arcpy.Exists(outputFilePath):
-        arcpy.Delete_management(outputFilePath)
+    if arcpy.Exists(outputFilePath) == True:
+        if shouldThisStepBeSkipped(state_abbrev, county_name, 'ProbSurf') == True:
+            print "ProbSurf skipped."
+            return outputFilePath
+        else:
+            arcpy.Delete_management(outputFilePath)
 
     arcpy.CopyFeatures_management (input_point_data, outputFilePath)
 
@@ -600,7 +651,8 @@ def probSurface(input_point_data, raster_dataset, output_location, state_abbrev,
         return outputFilePath
 
 
-def collapsePoints(input_point_data, output_location, state_abbrev, county_name):
+def collapsePoints(input_point_data, output_location, state_abbrev,
+                   county_name):
     ##
     ## This function creates a new file and uses the Integrate and CollectEvents
     ##  ArcGIS tools to collapse input points within 100m of each other to
@@ -615,15 +667,20 @@ def collapsePoints(input_point_data, output_location, state_abbrev, county_name)
 
     ## Set up names and FilePaths for the Ingetrate and CollectEvents files
     integrateOutputName = 'Integrate_' + state_abbrev + '_' + county_name
-
     integrateOutputFilePath = os.path.join(output_location, integrateOutputName)
     collectEventsOutputName = 'CollectEvents' + '_' + state_abbrev + '_' + county_name
     collectEventsOutputFilePath = os.path.join(output_location, collectEventsOutputName)
 
-    if arcpy.Exists(integrateOutputFilePath):
-        arcpy.Delete_management(integrateOutputFilePath)
-    if arcpy.Exists(collectEventsOutputFilePath):
-        arcpy.Delete_management(collectEventsOutputFilePath)
+    ## Check to see if it should skip. Otherwise delete existing files.
+    if arcpy.Exists(collectEventsOutputFilePath) == True:
+        if shouldThisStepBeSkipped(state_abbrev, county_name,
+                                   'CollectEvents') == True:
+            print "Integrate and CollectEvents skipped."
+            return collectEventsOutputFilePath
+        else:
+            arcpy.Delete_management(collectEventsOutputFilePath)
+            if arcpy.Exists(integrateOutputFilePath) == True:
+                arcpy.Delete_management(integrateOutputFilePath)
         
     arcpy.CopyFeatures_management (input_point_data, integrateOutputFilePath)
 
@@ -643,8 +700,8 @@ def collapsePoints(input_point_data, output_location, state_abbrev, county_name)
     finally:
         return collectEventsOutputFilePath
 
-def simulatedSampling(input_point_data, raster_dataset, output_location, state_abbrev, county_name,
-                      ssBins='default', iteration=None, random_seed=None):
+def simulatedSampling(input_point_data, raster_dataset, output_location, state_abbrev,
+                      county_name, ssBins='default', iteration=None, random_seed=None):
     ##
     ## This function randomly forces the data into a probability distribution
     ##  curve similar to the probabilty distribution found in the 'truth' data.
@@ -671,22 +728,34 @@ def simulatedSampling(input_point_data, raster_dataset, output_location, state_a
     outputName = 'SimSampling_' + state_abbrev + '_' + county_name
     outputFilePath = os.path.join(output_location, outputName)
     if arcpy.Exists(outputFilePath):
-        arcpy.Delete_management(outputFilePath) ## Delete any files without '_i#'
-    if iteration == 1 or iteration == None:
-        walk = arcpy.da.Walk(output_location, type="Point")
-        for dirpath, dirnames, filenames in walk:
-            for filename in filenames:
-                if 'AutoReview' in filename or 'SimSampling' in filename:
-                    if '_i' in filename:
-                        arcpy.Delete_management(os.path.join(dirpath, filename))
-                        print 'deleted:', os.path.join(dirpath, filename) ## REMOVE THIS LATER
-                                    ## Delete all files with '_i#' suffix.
+        if shouldThisBeSkipped(state_abbrev, county_name, 'SimSampling') == True:
+            print "SimSampling skipped."
+            return outputFilePath
+        else:
+            arcpy.Delete_management(outputFilePath) ## Delete any files without '_i#'
     if not iteration == None:
         ## If an iteration is specified, put that in the name. The 'i' stands for 'iteration'.
         outputName = 'SimSampling_' + state_abbrev + '_' + county_name + '_i' + str(iteration)
         outputFilePath = os.path.join(output_location, outputName)
+        if shouldThisStepBeSkipped(state_abbrev, county_name,
+                               'SimSampling') == True:
+            print "SimSampling skipped."
+            return outputFilePath
+    ## Before doing the first iteration, delete all files with the '_i' suffix.
+    if iteration <= 1 or iteration == None:
+        walk = arcpy.da.Walk(output_location, type="Point")
+        for dirpath, dirnames, filenames in walk:
+            for filename in filenames:
+                if 'AutoReview' in filename or 'SimSampling' in filename:
+                    if '_i' in filename and state_abbrev in filename \
+                    and county_name in filename:
+                        arcpy.Delete_management(os.path.join(dirpath, filename))
+                        print 'deleted:', os.path.join(dirpath, filename) ## REMOVE THIS LATER
+                                
 
-    
+    ## Okay, now that we have either skipped this whole function or deleted outdated
+    ##  iterations, now we can continue.
+        
     ## Create a new file with all points. This function will delete most of the points later on.
     arcpy.CopyFeatures_management (input_point_data, outputFilePath)
 
@@ -845,7 +914,8 @@ def simulatedSampling(input_point_data, raster_dataset, output_location, state_a
         return outputFilePath
     
 
-def project(input_data, output_location, UTM_code, state_abbrev, county_name, iteration=None):
+def project(input_data, output_location, UTM_code, state_abbrev,
+            county_name, iteration=None):
     ##
     ## This function projects the input from the UTM county projection into
     ##  WGS 1984 Geographic Coordinate System.
@@ -860,8 +930,12 @@ def project(input_data, output_location, UTM_code, state_abbrev, county_name, it
         outputName = 'AutoReview_' + state_abbrev + '_' + county_name + '_i' + str(iteration) 
     outputFilePath = os.path.join(output_location, outputName)
 
-    if arcpy.Exists(outputFilePath):
-        arcpy.Delete_management(outputFilePath)
+    if arcpy.Exists(outputFilePath) == True:
+        if shouldThisStepBeSkipped(state_abbrev, county_name, 'ProbSurf') == True:
+            print "ProbSurf skipped."
+            return outputFilePath
+        else:
+            arcpy.Delete_management(outputFilePath)
         
     meridian = centralMeridian[int(UTM_code)] ## centralMeridian is a dictionary found in Setting_up_counties_database.py
                                               ##  and specifies the central meridian for the projection
@@ -885,7 +959,7 @@ def project(input_data, output_location, UTM_code, state_abbrev, county_name, it
         return outputFilePath
 
 
-def markCountyAsCompleted(clusterGDB, progress_tracking_file, state_abbrev, county_name):
+def markCountyAsCompleted(clusterGDB, progress_tracking_file, state_abbrev, county_name, iteration=None):
 ##
 ## This function edits a CSV and fills in which counties have been
 ##  completed so far.
@@ -893,8 +967,13 @@ def markCountyAsCompleted(clusterGDB, progress_tracking_file, state_abbrev, coun
     
     state_name = nameFormat(state_abbrev_to_name[state_abbrev])
     county_name = nameFormat(county_name)
-
+    
     timeValue = str( int( round(time.time(), 0) ) )
+
+    if iteration == None:
+            iterationValue = None
+    else:
+            iterationValue = 'i' + str(iteration)
     
     #if not os.path.exists(filePath):
      #   code = 'wb'
@@ -903,7 +982,7 @@ def markCountyAsCompleted(clusterGDB, progress_tracking_file, state_abbrev, coun
 
     with open(progress_tracking_file, 'ab') as g:
         writer = csv.writer(g, dialect = 'excel') 
-        writer.writerow([state_name, county_name])
+        writer.writerow([state_name, county_name], iterationValue)
         
 
 
@@ -939,7 +1018,7 @@ if __name__ == '__main__':
 
             ## Reset the file parameters, so that if there are errors they are not used again
             try:
-                del clipFile, larFile, maskFile, collapsePointsFile, autoReviewFile
+                del clipFile, larFile, maskFile, collapsePointsFile, simSamplingFile, autoReviewFile
             except: ()
             
             intermed_list = []  # this will be filled later with the FilePaths to all the intermediate
@@ -1024,7 +1103,7 @@ if __name__ == '__main__':
                 print(e.args[0])
                 errors.append(['Integrate or CollectEvents', state_abbrev, county_name, e.args[0] ])
                 
-             ## Note: this sets up a loop, running 
+            ## Note: this sets up a loop, running for each iteration
             for eachIteration in range(1, numIterations+1):
                 if numIterations <=1:
                     iterationNumber = None
@@ -1045,7 +1124,7 @@ if __name__ == '__main__':
                     e = sys.exc_info()[1]
                     print(e.args[0])
                     errors.append(['SimSampling', state_abbrev, county_name, e.args[0] ])
-                    del simSamplingFile
+                    simSamplingFile = ''
                     
                                
                 #          #
@@ -1056,7 +1135,8 @@ if __name__ == '__main__':
                     autoReviewFile = project(simSamplingFile, clusterGDB,  UTM, state_abbrev, county_name,
                                              iteration=iterationNumber)
                     if trackWhichCountiesAreCompleted == True:
-                        markCountyAsCompleted(clusterGDB, progress_tracking_file, state_abbrev, county_name)
+                        markCountyAsCompleted(clusterGDB, progress_tracking_file, state_abbrev,
+                                              county_name, iteration=iterationNumber)
                     print "Projected. Script duration so far:", checkTime()
                 except:
                     e = sys.exc_info()[1]
