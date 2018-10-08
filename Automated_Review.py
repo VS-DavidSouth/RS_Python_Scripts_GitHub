@@ -69,6 +69,8 @@ regional_35_counties = [
      r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst\Tennessee\BatchGDB_TN_Z16_c1.gdb',
     ]
 
+
+###### NOTE TO SELF: run OR, WA, and CA last!! They might have extra masks.######
 clusterList = regional_35_counties
     #[
      #r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst\Mississippi\BatchGDB_MS_Z16_c2.gdb',
@@ -86,8 +88,10 @@ prob_surface_threshold = 0.1   # Points with values < or = threshold will be del
 county_outline_folder = r'N:\Remote Sensing Projects\2016 Cooperative Agreement Poultry Barns\Documents\Deliverables\Library\CountyOutlines'
 
 ## Location of the adjusted NASS values CSV
-adjNASS_CSV = r'R:\Nat_Hybrid_Poultry\Documents\adjNASS_FINAL_CSV.csv'
+adjFLAPS_CSV = r'R:\Nat_Hybrid_Poultry\Documents\adjFLAPS_FINAL_CSV.csv'
 
+## Location of the tracking file. If no file is present at this location,
+##  the script will create a new blank file and begin to fill it.
 progress_tracking_file = r'R:\Nat_Hybrid_Poultry\Documents\trackingFileCSV.csv'
 
 ## This folder should be the location where all the state folders are, which will each store the GDBs of the state clusters
@@ -114,6 +118,9 @@ neg_masks = [
              [r'N:\Geo_data\ESRI_Data\ESRI_Base_Data_2012\streetmap_na\data\streets.sdc\streets', 20],
              [r'N:\Geo_data\ESRI_Data\ESRI_Base_Data_2014\usa\hydro\dtl_wat.gdb\dtl_wat', 0],
              [r'N:\Geo_data\ESRI_Data\ESRI_Base_Data_2014\usa\hydro\dtl_riv.gdb\dtl_riv', 10],
+             # [r'R:\Nat_Hybrid_Poultry\Remote_Sensing\PADUS\PADUS1_4Shapefile\PADUS_WA_OR_CA_FED_STAT_LOC.shp, 0]
+                 ## The above line is added if the current state_abbrev is WA, OR, or CA. This
+                 ##  can be verified by checking the DO STUFF section.
             ]
 
 pos_masks = [
@@ -134,26 +141,17 @@ numIterations = 10 # Any number >1 will result in several iterations of simualte
 ## If steps have been completed before, there may be no need to repeat them because
 ##  there will simply output the exact same result. If that is the case for all
 ##  clusters this script will run, those steps to this list.append  They will be skipped. 
-skipList = [    ## NOTE TO SELF: It would probably be easiest to simply add in a
-                ##  'skip' argument of True or False to each major function. Then
-                ##  when skip=True you simply have it return the output file path
-                ##  before it actually does any geoprocessing.
+skipList = [
             ## 1st column, put the state abbreviation in CAPS as a string.
-            ## 2nd column, put county name as a string.
+            ## 2nd column, put county name as a string, or 'all_counties'.
             ## 3rd column, put either 'Clip', 'Mask', 'LAR', 'ProbSurf',
-            ##  'CollectEvents', 'SimSampling' or 'all'. The latter indicates
+            ##  'CollectEvents', 'SimSampling' or 'all_steps'. The latter indicates
             ##  that no geoprocesses should be done for that file, since it is
             ##  already completed.
+            ## Note: be sure to include commas after each line: ['AL', 'Coffee', 'all_steps'],
     
-            ['AL', 'Barbour',  'all'],
-            ['AL', 'Blount',   'all'],
-            ['AL', 'Bullock',  'all'],
-            ['AL', 'Coffee',   'all'],
-            ['AL', 'Cullman',  'all'],
-            ['AL', 'DeKalb',   'all'],
-            ['AL', 'Geneva',   'all'],
-            ['AL', 'Madison',  'all'],
-            ['AL', 'Marshall', 'all'],
+            #['AL', 'all_counties', 'all_steps'], ## This is kept as a template.
+            
             ]
 
 ## Overwrite certain parameters set above, if this tool is run as a custom
@@ -223,8 +221,7 @@ prefix_dict = {
     'Mask': 'The Clip file with points removed based on a series of masking layers',
     'LAR': 'The Mask file with points removed based on Length or AspRatio values outside of the thresholds',
     'ProbSurf': 'The LAR file with points removed according to a threshold value for the probablity surface',
-    'Integrate': 'The ProbSurf file with points within 100m of each other are moved on top of one another at the centroid; no points are removed',
-    'CollectEvents': 'Integrate file with points on top of one another combined to a single point',
+    'CollectEvents': 'The ProbSurf file with points within 100m of each other are moved on top of one another at the centroid and combined to a single point',
     'SimSampling': 'The CollectEvents file with points sorted into bins and many points removed to ensure each bin has the appropriate number of points, according to the Adjusted NASS values',
     'AutoReview': 'The final stage, which is the CollectEvents file but projected into NAD 1983 with coordinate fields added',
     }
@@ -271,11 +268,13 @@ def shouldThisStepBeSkipped(state_abbrev, county_name, step_name):
     ##  the specified county is in skipList.
     ##
     county_name_unformat = nameFormat(county_name)
-    for county in skipList:
-        if state_abbrev == county[0]:
-            if nameFormat(county_name) == nameFormat(county[1]):
-                if county[2].lower() == 'all' \
-                or step_name.lower() == county[2].lower():
+    for skipItem in skipList:
+        if skipItem[0] == state_abbrev:
+            if skipItem[1] == 'all_counties':
+                return True
+            elif nameFormat(skipItem[1]) == nameFormat(county_name):
+                if skipItem[2].lower() == 'all_steps' \
+                or skipItem[2].lower() == step_name.lower():
                     return True
     ## If it isn't in the skipList, just return false
     return False
@@ -392,7 +391,6 @@ def clip(input_feature, clip_files, output_location, state_abbrev,
     outputFilePath = os.path.join(output_location, outputName)
 
     if arcpy.Exists(outputFilePath) == True:
-        print "IT EXISTS!"
         if shouldThisStepBeSkipped(state_abbrev, county_name, 'Clip') == True:
             print "Clip skipped."
             return outputFilePath
@@ -665,9 +663,7 @@ def collapsePoints(input_point_data, output_location, state_abbrev,
     county_name = nameFormat(county_name)
     state_name = nameFormat(state_abbrev_to_name[state_abbrev])
 
-    ## Set up names and FilePaths for the Ingetrate and CollectEvents files
-    integrateOutputName = 'Integrate_' + state_abbrev + '_' + county_name
-    integrateOutputFilePath = os.path.join(output_location, integrateOutputName)
+    ## Set up name and FilePath for CollectEvents file
     collectEventsOutputName = 'CollectEvents' + '_' + state_abbrev + '_' + county_name
     collectEventsOutputFilePath = os.path.join(output_location, collectEventsOutputName)
 
@@ -675,28 +671,29 @@ def collapsePoints(input_point_data, output_location, state_abbrev,
     if arcpy.Exists(collectEventsOutputFilePath) == True:
         if shouldThisStepBeSkipped(state_abbrev, county_name,
                                    'CollectEvents') == True:
-            print "Integrate and CollectEvents skipped."
+            print "collapsePoints skipped."
             return collectEventsOutputFilePath
         else:
             arcpy.Delete_management(collectEventsOutputFilePath)
-            if arcpy.Exists(integrateOutputFilePath) == True:
-                arcpy.Delete_management(integrateOutputFilePath)
+
+    tempIntegrateFile = os.path.join('in_memory', 'temp_integrate')
         
-    arcpy.CopyFeatures_management (input_point_data, integrateOutputFilePath)
+    arcpy.CopyFeatures_management (input_point_data, tempIntegrateFile)
 
     ## The input file path to the Integrate tool NEEDS to have no spaces in it, otherwise it will cause errors
-    arcpy.Integrate_management(in_features = integrateOutputFilePath, cluster_tolerance = "100 Meters")
+    arcpy.Integrate_management(in_features = tempIntegrateFile, cluster_tolerance = "100 Meters")
 
     ## Collapse points that are on top of eachother to single points
-    arcpy.CollectEvents_stats(Input_Incident_Features = integrateOutputFilePath, \
+    arcpy.CollectEvents_stats(Input_Incident_Features = tempIntegrateFile, \
                               Output_Weighted_Point_Feature_Class = collectEventsOutputFilePath)
+
+    arcpy.Delete_management(tempIntegrateFile)
 
     addFipsInfo(collectEventsOutputFilePath, state_abbrev, county_name)
 
     ## Add the old file to the list of intermediate files
     try:
         intermed_list.append(input_point_data)
-        intermed_list.append(integrateOutputFilePath)
     finally:
         return collectEventsOutputFilePath
 
@@ -763,26 +760,26 @@ def simulatedSampling(input_point_data, raster_dataset, output_location, state_a
     ##  the ProbSurf_1 and ProbSurf_2 fields. 
     addRasterInfo(outputFilePath, raster_dataset, field_name_1='ProbSurf_1', field_name_2='ProbSurf_2')
 
-    #                                     #
-    ### SETUP TO READ FROM adjNASS FILE ###
-    #                                     #
-    def readAdjNASS(adjNASS_CSV):
+    #                                      #
+    ### SETUP TO READ FROM adjFLAPS FILE ###
+    #                                      #
+    def readAdjFLAPS(adjFLAPS_CSV):
         ##
-        ## This funtion reads the adjNASS_CSV file and returns the adjusted NASS value.
+        ## This funtion reads the adjFLAPS_CSV file and returns the adjusted NASS value.
         ##
-        with open(adjNASS_CSV) as csvfile:
+        with open(adjFLAPS_CSV) as csvfile:
             reader = csv.reader(csvfile, delimiter=',')
             for row in reader:
                 ## If the row matches the state and county (once they have been
-                ##  formatted and capitalized properly), save the adjNASS field
-                ##  value as the adjNASS variable, which is returned out of the
+                ##  formatted and capitalized properly), save the adjFLAPS field
+                ##  value as the adjFLAPS variable, which is returned out of the
                 ##  function.
                 if nameFormat(row[1]).title() == state_name.title() \
                 and nameFormat(row[2]).title() == county_name.title():
-                    adjNASS = row[8] ## BE SURE TO DOUBLE CHECK THAT IT IS READING
+                    adjFLAPS = row[8] ## BE SURE TO DOUBLE CHECK THAT IT IS READING
                                      ##  THE RIGHT COLUMN! This could cause many errors.
                     
-                    return adjNASS
+                    return adjFLAPS_value
                 
                 ## If there are no values in the 2nd or 3rd column, check the 12th column.
                 elif row[1] == '' and row[2] == '':
@@ -795,14 +792,14 @@ def simulatedSampling(input_point_data, raster_dataset, output_location, state_a
                         ##  sliced with the \ as the dividing line.
                     
                     if tempStateName == state_name.title() and tempCountyName == county_name.title():
-                        adjNASS = row[16]
+                        adjFLAPS_value = row[16]
                         
                         del tempIndex, tempStateName, tempCountyName ## Reset the temp variables so you don't get them mixed up.
 
-                        return adjNASS
+                        return adjFLAPS_value
                     
-    adjNASS = readAdjNASS(adjNASS_CSV)
-    print "----Total number of points to select:", adjNASS ## REMOVE THIS LATER
+    adjFLAPS = readAdjFLAPS(adjFLAPS_CSV)
+    print "----Total number of points to select:", adjFLAPS ## REMOVE THIS LATER
 
     #                #
     ### SETUP BINS ###
@@ -833,11 +830,11 @@ def simulatedSampling(input_point_data, raster_dataset, output_location, state_a
     
     ## Add column 5 to array, then fill it with
     ##  the proper number of points to draw from that bin, calculated as
-    ##  column 3 percentage times adjNASS total for that county.
+    ##  column 3 percentage times adjFLAPS total for that county.
     ssBins = np.insert(ssBins, 4, np.zeros(len(ssBins)), axis=1) ## create column 4 (index 3) and fill it with meaningless zeros
     for row in ssBins:
         ## Now actually fill column 5 with a rounded number of points to draw from that bin.
-        row[4] = round( float(row[3])/100. * float(adjNASS), 0)
+        row[4] = round( float(row[3])/100. * float(adjFLAPS), 0)
         print '----' + str(int(row[0])),'points:', str(row[4])
 
     if not round(sum(ssBins[:,3]),1) == 100.0:
@@ -886,6 +883,10 @@ def simulatedSampling(input_point_data, raster_dataset, output_location, state_a
             if not random_seed == None:
                 random.seed(random_seed)
             selectedPoints.append(random.sample(pointsPool, int(specificBin[4])) )
+                ## Note that random.sample(...) is sampling without replacement,
+                ##  meaning that once a point is drawn, it cannot be drawn out
+                ##  again. You will not get duplicates of the same point.
+            
         ## If there are too few points in that pool, select them all instead of taking some random points.
         except ValueError:
             print "Welp, guess we gotta take all the points for category", int(specificBin[0]) ## REMOVE THIS LATER
@@ -931,8 +932,8 @@ def project(input_data, output_location, UTM_code, state_abbrev,
     outputFilePath = os.path.join(output_location, outputName)
 
     if arcpy.Exists(outputFilePath) == True:
-        if shouldThisStepBeSkipped(state_abbrev, county_name, 'ProbSurf') == True:
-            print "ProbSurf skipped."
+        if shouldThisStepBeSkipped(state_abbrev, county_name, 'Project') == True:
+            print "Project skipped."
             return outputFilePath
         else:
             arcpy.Delete_management(outputFilePath)
@@ -982,7 +983,7 @@ def markCountyAsCompleted(clusterGDB, progress_tracking_file, state_abbrev, coun
 
     with open(progress_tracking_file, 'ab') as g:
         writer = csv.writer(g, dialect = 'excel') 
-        writer.writerow([state_name, county_name], iterationValue)
+        writer.writerow([state_name, county_name, iterationValue])
         
 
 
@@ -1032,6 +1033,15 @@ if __name__ == '__main__':
                                           state_name + '.gdb',
                                           county_name + 'Co' + state_abbrev + '_outline')
             FIPS, UTM = findFIPS_UTM(county_outline)
+
+            ## Do some stuff that is unique to WA, OR and CA
+            state_land_mask = r'R:\Nat_Hybrid_Poultry\Remote_Sensing\PADUS\PADUS1_4Shapefile\PADUS_WA_OR_CA_FED_STAT_LOC.shp'
+            if state_abbrev in ['WA', 'OR', 'CA']: ## REMOVE THIS LATER      
+                if not [state_land_mask, 0] in neg_masks:
+                    neg_masks += [ [state_land_mask, 0] ]
+            else:
+                if [state_land_mask, 0] in neg_masks:
+                    neg_masks.remove([state_land_mask, 0])
 
             #          #
             # CLIPPING #
@@ -1093,7 +1103,6 @@ if __name__ == '__main__':
             #               #
             #COLLAPSE POINTS#
             #               #
-            ## Note: This creates two intermediate files, Integrate and CollectEvents
             print "Collapsing points for", state_name, county_name + "..."
             try:
                 collapsePointsFile = collapsePoints(probSurfaceFile, clusterGDB, state_abbrev, county_name)
@@ -1101,7 +1110,7 @@ if __name__ == '__main__':
             except:
                 e = sys.exc_info()[1]
                 print(e.args[0])
-                errors.append(['Integrate or CollectEvents', state_abbrev, county_name, e.args[0] ])
+                errors.append(['Collapse Points', state_abbrev, county_name, e.args[0] ])
                 
             ## Note: this sets up a loop, running for each iteration
             for eachIteration in range(1, numIterations+1):

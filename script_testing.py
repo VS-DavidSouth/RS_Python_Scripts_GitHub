@@ -23,8 +23,8 @@ def run(iterationVal):
                                                         state_abbrev, county_name, ssBins='default',
                                                         iteration=iterationVal )
 
-shouldThisStepBeSkipped(state_abbrev, county_name, 'Clip')
-#markCountyAsCompleted(clusterGDB, progress_tracking_file, state_abbrev, county_name)
+#shouldThisStepBeSkipped(state_abbrev, county_name, 'Clip')
+markCountyAsCompleted(clusterGDB, progress_tracking_file, state_abbrev, county_name)
 
 #for num in range(1,3):   
 #    run(num)
