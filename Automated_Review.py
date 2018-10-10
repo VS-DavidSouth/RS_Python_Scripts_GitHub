@@ -5,7 +5,7 @@
 ############################
 
 ##
-## Created by David South 7/9/18, updated 8/9/18
+## Created by David South 7/9/18, updated 10/10/18
 ##
 ## Script Description:
 ##      This script is intended for use with remotely sensed poultry data
@@ -1071,7 +1071,7 @@ if __name__ == '__main__':
                     errors.append(['Masking', state_abbrev, county_name, e.args[0] ])
             else:
                 print "No masking files selected."
-                maskFile = larFile  # This essentially just skips the masking step
+                maskFile = clipFile  # This essentially just skips the masking step
                 
 
             #          #
@@ -1113,10 +1113,10 @@ if __name__ == '__main__':
                 errors.append(['Collapse Points', state_abbrev, county_name, e.args[0] ])
                 
             ## Note: this sets up a loop, running for each iteration
-            for eachIteration in range(1, numIterations+1):
-                if numIterations <=1:
-                    iterationNumber = None
-                else:
+            if numIterations <=1 or numIterations is None:
+                iterationNumber = None
+            else:
+                for eachIteration in range(1, numIterations+1):
                     iterationNumber = eachIteration
 
                 #          #
