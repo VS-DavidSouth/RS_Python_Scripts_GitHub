@@ -914,7 +914,7 @@ def simulated_sampling(input_point_data, raster_dataset, output_location, state_
         # taking some random points.
         except ValueError:
             print "Welp, guess we gotta take all the points for category", \
-                int(specificBin[0]) # REMOVE THIS LATER
+                int(specificBin[0])
             selected_points.append(pointsPool)
 
     # Create a list of just the OBJECTID values, which will be used to delete points.
