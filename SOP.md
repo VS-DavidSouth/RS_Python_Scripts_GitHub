@@ -1,15 +1,15 @@
-PHASE 1: CREATING MODELS 
+## PHASE 1: CREATING MODELS 
     A. Requires resampled NAIP imagery 
         i. Resample_NAIP.py script 
     B. See documentation from the regional pilot study with 35 counties.
     
     
-PHASE 2: USING FEATURE ANALYST TO CREATE BATCH FILES 
+## PHASE 2: USING FEATURE ANALYST TO CREATE BATCH FILES 
     A. Each Batch file needs to have 'Batch' as a prefix and the state abbreviation and county name
     
     
-PHASE 3: AUTOMATED REVIEW SCRIPT
-    SECTION A. Getting set up to run the Automated_Review Python script 
+## PHASE 3: AUTOMATED REVIEW SCRIPT
+###    SECTION A. Getting set up to run the Automated_Review Python script 
         i. How to run the script: 
             Open the Automated_Review.py file in IDLE(Python GUI), the IDE that comes with ArcGIS. This can be done by right clicking the Automated_Review.py file on a computer with ArcGIS installed, and clicking "Edit with IDLE" 
         ii. DO NOT DOUBLE CLICK OR RUN THE SCRIPT FILE WITHOUT CHECKING THAT THE PARAMETERS ARE CORRECT FIRST! 
@@ -64,7 +64,7 @@ PHASE 3: AUTOMATED REVIEW SCRIPT
                 AR_min_threshold 
                 numIterations 
                 
-        SECTION B. Main sections of the Automated_Review script 
+ ###       SECTION B. Main sections of the Automated_Review script 
             1. Description 
                 a. A general overview of the script. 
             2. Setup 
@@ -87,5 +87,5 @@ PHASE 3: AUTOMATED REVIEW SCRIPT
             4. Define Functions 
             5. Do Stuff 
 
-PHASE 4: APPLYING FLAPS
+## PHASE 4: APPLYING FLAPS
     TBD
