@@ -20,5 +20,36 @@ if 1==2:
                                               county_name + 'Co' + state_abbrev + '_outline')
 
 
+def check_parameters():
+    should_be_files = [prob_surface_raster, ]
+    should_be_folder = [county_outline_folder, ]
+    should_be_booleans = [run_script_as_tool, save_intermediates, track_completed_counties, ]
+    should_be_lists = [cluster_list, neg_masks, pos_masks, skip_list, ]
+    should_be_number = [prob_surface_threshold, L_max_threshold, L_min_threshold, AR_max_threshold, AR_min_threshold,
+                        num_iterations, ]
+    for thing in should_be_files:
+        try:
+            os.path.isfile(thing)
+        except Exception:
+            raise TypeError('Needs to be a file.')
+    for thing in should_be_folder:
+        try:
+            os.path.isdir(thing)
+        except Exception:
+            raise TypeError('Needs to be a folder/directory')
+    for thing in should_be_booleans:
+        if thing is True or thing is False:
+            ()
+        else:
+            raise TypeError('Not Boolean')
+    for thing in should_be_lists:
+        if not isinstance(thing, list):
+            raise TypeError('Not list')
+    for thing in should_be_number:
+        try:
+            thing + 1
+        except Exception:
+            raise TypeError('Not number')
+
 
 print "Ready to test."
