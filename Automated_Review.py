@@ -266,13 +266,84 @@ def check_time():
 
     else:
         return str(round( time_so_far / 60. , 1)) + " hours"
+
+
+def check_parameters():
+    """This function is somewhat unpythonic, but it serves as a simple way of
+   making sure that minor errors like forgetting the [] around an entry in
+   cluster_list won't cause strange errors that are confusing for users who
+   have little to no experience in Python.  If parameter
+   names are changed, be sure to change them in this function too!
+
+   To disable this function, simply remove or comment out the following line
+   in the code:
+           check_parameters()
+   """
+    should_be_files = [
+        (prob_surface_raster, 'prob_surface_raster'),
+        ]
+    should_be_folder = [
+        (county_outline_folder, 'county_outline_folder'),
+        ]
+    should_be_booleans = [
+        (run_script_as_tool, 'run_script_as_tool'),
+        (save_intermediates, 'save_intermediates'),
+        (track_completed_counties, 'track_completed_counties'),
+        ]
+    should_be_lists = [
+        (cluster_list, 'cluster_list'),
+        (neg_masks, 'neg_masks'),
+        (pos_masks, 'pos_masks'),
+        (skip_list, 'skip_list')
+        ]
+    should_be_number_or_None = [
+        (prob_surface_threshold, 'prob_surface_threshold'),
+        (L_max_threshold, 'L_max_threshold'),
+        (L_min_threshold, 'L_min_threshold'),
+        (AR_max_threshold, 'AR_max_threshold'),
+        (AR_min_threshold, 'AR_min_threshold'),
+        (num_iterations, 'num_iterations')
+        ]
+    for thing in should_be_files:
+        parameter = thing[0]
+        param_name = thing[1]
+        try:
+            os.path.isfile(parameter)
+        except Exception:
+            raise TypeError(param_name + ' needs to be a file.')
+    for thing in should_be_folder:
+        parameter = thing[0]
+        param_name = thing[1]
+        try:
+            os.path.isdir(parameter)
+        except Exception:
+            raise TypeError(param_name + ' needs to be a folder/directory.')
+    for thing in should_be_booleans:
+        parameter = thing[0]
+        param_name = thing[1]
+        if parameter is True or parameter is False:
+            ()
+        else:
+            raise TypeError(param_name + ' needs to be a boolean, True or False.')
+    for thing in should_be_lists:
+        parameter = thing[0]
+        param_name = thing[1]
+        if not isinstance(parameter, list):
+            raise TypeError(param_name + ' needs to be a list')
+    for thing in should_be_number_or_None:
+        parameter = thing[0]
+        param_name = thing[1]
+        if parameter is not None:
+            try:
+                parameter + 1
+            except Exception:
+                raise TypeError(param_name + ' needs to be a number, either an integer or a float.')
     
 
 def should_step_be_skipped(state_abbrev, county_name, step_name):
     """This function returns either True or False, based on whether
     the specified county is in skip_list.
     """
-    county_name_unformat = nameFormat(county_name)
     for skip_item in skip_list:
         if skip_item[0] == state_abbrev:
             if skip_item[1] == 'all_counties':
@@ -644,7 +715,8 @@ def prob_surface(input_point_data, raster_dataset, output_location,
 
     arcpy.CopyFeatures_management (input_point_data, output_file_path)
 
-    # Call add_raster_info over to do some stuff for us.
+    # Call add_raster_info to add the probability surface information to the
+    # input file.
     add_raster_info(output_file_path, raster_dataset)
 
     # Apply threshold.
@@ -819,7 +891,7 @@ def simulated_sampling(input_point_data, raster_dataset, output_location, state_
     #                #
     ### SETUP BINS ###
     #                #
-    ## Note that ssBins stands for simulated sampling bins.
+    # Note that ssBins stands for simulated sampling bins.
     if ssBins == 'default' and prob_surface_threshold == 0.1:
         # Column 1 is the numeric label for each bin.
         # Columns 2 and 3 are the lower and upper values for that
@@ -1029,6 +1101,8 @@ def delete_intermediates(intermed_list):
 ############################
 
 if __name__ == '__main__':
+
+    check_parameters()
 
     errors = []
 
