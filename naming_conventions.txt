@@ -1,0 +1,56 @@
+This document explains the naming convention of all geospatial files and 
+files related to the remote sensing or Automated_Review procedure.
+Check with the NAMING CONVENTIONS section of the Automated_Review.py script
+to make sure that this document matches any changes made in there.
+
+NAMING CONVENTIONS:
+Names for all files created in this script will follow the the same format.
+     [prefix]_[ST]_Z[##]_c[#]_[CountyName]_i[#].[ext]
+
+Not all files will have the all of the identifiers listed below.
+When in doubt, look for similar files for reference, or 
+include as many identifiers as are applicable.
+
+Identifiers:
+    [prefix]     -> a unique identifier for each type of file, 
+                    below is a dictionary explaining each prefix
+    [ST]         -> the 2-letter state abbreviation
+    Z[##]        -> the UTM zone number
+    c[#]         -> the cluster number
+    [CountyName] -> the specific county name
+    i[#]         -> the iteration number
+    .[ext]       -> the file extension (this is not shown when 
+                    viewing ArcGIS files in ArcCatalog)
+
+Unique prefixes:
+    NAIP: Downloaded 1m resolution NAIP areal imagery
+    NAIP2m: 2m resampled NAIP imagery
+    Model: AFE file that is used to create the Batch files 
+           for a particular state
+    ModelGDB: The file geodatabase that was used to create
+              the Model for that state
+    ModelMXD: The ArcMap MXD that was used to run Feature 
+              Analyst to create the Model
+    BatchGDB: A file geodatabase that contains all the 
+              intermediate files for the creation of the 
+              Batch file
+    BatchMXD: The ArcMap MXD file that was used to run Feature
+              Analyst to create the Batch file
+    Clip: The Batch file clipped to the county
+    Mask: The Clip file with points removed based on a series
+          of masking layers
+    LAR: The Mask file with points removed based on Length or
+         AspRatio values outside of the thresholds
+    ProbSurf: The LAR file with points removed according to a
+              threshold value for the probablity surface
+    Integrate: The ProbSurf file with points within 100m of
+               each other are moved on top of one another at the
+               centroid; no points are removed
+    CollectEvents: Integrate file with points on top of one
+                   another combined to a single point
+    SimSampling: The CollectEvents file with points sorted into
+                 bins and many points removed to ensure each bin
+                 has the appropriate number of points, according
+                 to the Adjusted NASS values
+    AutoReview: The final stage, which is the CollectEvents file but projected into NAD 1983 with coordinate fields added
+    
