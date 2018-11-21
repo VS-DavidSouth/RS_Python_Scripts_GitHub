@@ -133,7 +133,7 @@ pos_masks = [
 # Any points outside of these bounds are deleted automatically.
 # L values are in meters. If you don't want to include a particular threshold,
 # set equal to None.
-L_max_threshold = 500  # Use None if you don't want to delete based on max Length
+L_max_threshold = 500
 L_min_threshold = 50
 AR_max_threshold = None
 AR_min_threshold = None
@@ -144,7 +144,7 @@ AR_min_threshold = None
 ssBins_matrix = 'default'
 
 # Define num_iterations. Any number >1 will result multiple several iterations
-# of the simualtedSampling and project functions, with a unique file for each.
+# of the simulated_sampling and project functions, with a unique file for each.
 # If a decimal is put in here, it will be rounded down.  This can be set to None.
 num_iterations = 10
 

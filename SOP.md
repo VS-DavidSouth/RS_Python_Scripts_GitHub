@@ -53,7 +53,7 @@ Things required to run the script:
 	  * `saveIntermediates`
 	* Associated functions: 
 	  * Basically any function that outputs a file will put them at the location specified in output_folder unless told otherwise. 
-9. All of the values to be used for the Parameters section of the code. These include the following variables:  
+9. Important numeric parameters. These include the following variables:  
  	* `prob_surface_threshold`
  	* `L_max_threshold`
  	* `L_min_threshold`
@@ -70,13 +70,15 @@ General structure of the script:
 	  * `sys` 
 	  * `numpy` (refereed to as `np`)
 3. Parameters
-	* Most of the parameters are important to look at, but several are entirely optional and there only to make things easier. They are as follows: 
+	* Some parameters are optional and may or may not need to be specified. They are as follows: 
 	  * `runScriptAsTool`
 	  * `saveIntermediates`
 	  * `trackWhichCountiesAreCompleted`
-	  * `regional_35_counties` 
+	  * `regional_35_counties`
+	  * `ssBins_matrix`
+	  * `skip_list`
 	  * The whole `if runScriptAsTool == True:` section. Ignore this if you aren't using the script as a custom arcGIS tool. 
-	  * `LAR_thresholds`, this is really just putting 4 parameters into a single list which is easier to input into the LAR function. Note that the individual `L_max_threshold` and similar parameters still need to be checked.
+	  * `LAR_thresholds`, This doesn't need to be messed with because it is really just putting 4 parameters into a single list which is easier to input into the LAR function. Note that the individual `L_max_threshold` and similar parameters still need to be checked.
 4. Define Dictionaries 
 	* This section describes the naming structure used throughout the project for all the files and GDBs. 
 	  * `prefix_dict` is a dictionary that includes the prefixes and descriptions for all files associated with this section of the project.  
