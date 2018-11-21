@@ -5,28 +5,32 @@
 ############################
 
 #
-# Created by David South 7/9/18, updated 10/10/18
+# Created by David South 7/9/18, updated 11/20/18
 #
 # Script Description:
 #      This script is intended for use with remotely sensed poultry data
-#       exported from the Feature Analyst extension in vector point form.
+#      exported from the Feature Analyst extension in vector point form.
 #      It is intended to be used to remove clutter from the input dataset
-#       using various methods. It requires a probability surface raster,
-#       as well as county polygon files for each county that will be
-#       referenced during the course of the script.
+#      using various methods. It requires a probability surface raster,
+#      as well as county polygon files for each county that will be
+#      referenced during the course of the script.
 #
-# This script is designed to be used as a custom ArcGIS tool. Instructions
-# for setting it up in ArcGIS will be included. Reference this URL:
+# This script has untested functionality to be used as a custom ArcGIS Python tool.
+# Instructions for setting it up in ArcGIS are included in the "if run_script_as_tool == True:"
+# section.  Reference this URL:
 # http://desktop.arcgis.com/en/arcmap/10.3/analyze/creating-tools/adding-a-script-tool.htm
 #
 # The Spatial Analyst ArcGIS extension is required for the ProbSurface portion
 # of this script.
 #
 
+
 ############################
 ########## SETUP ###########
 ############################
-
+# This next import gives us access to two dictionaries for
+# converting state names to abbreviations and vice versa.
+from Converting_state_names_and_abreviations import *
 import os
 import sys
 import csv
@@ -37,10 +41,6 @@ import arcpy
 
 start_time = time.time()
 arcpy.env.OverwriteOutput = True
-
-# This next import gives us access to two dictionaries for
-# converting state names to abbreviations and vice versa.
-from Converting_state_names_and_abreviations import *
 
 
 ############################
@@ -138,8 +138,14 @@ L_min_threshold = 50
 AR_max_threshold = None
 AR_min_threshold = None
 
+# The ssBins_matrix can be specified manually. See the simulated_sampling function
+# for more documentation. Make sure this agrees with the prob_surface_threshold.
+# If no matrix is specified, set ssBins_matrix = 'default'.
+ssBins_matrix = 'default'
+
 # Define num_iterations. Any number >1 will result multiple several iterations
 # of the simualtedSampling and project functions, with a unique file for each.
+# If a decimal is put in here, it will be rounded down.  This can be set to None.
 num_iterations = 10
 
 # Use skip_list to specify that certain counties, or steps for specific counties
@@ -490,6 +496,11 @@ def LAR(input_feature, output_location, LAR_thresholds,
     AR_max_threshold = LAR_thresholds [1][0]
     AR_min_threshold = LAR_thresholds [1][1]
 
+    # Skip the LAR step if none of the thresholds are set to anything.
+    if all((L_max_threshold is None, L_min_threshold is None,
+             AR_max_threshold is None, AR_min_threshold is None,)):
+        return input_feature
+
     # Get rid of any weird characters in the county name.
     county_name = nameFormat(county_name)
 
@@ -699,6 +710,7 @@ def prob_surface(input_point_data, raster_dataset, output_location,
     """This function exists to replace the Manual Review step of the regional
     remote sensing procedure. It uses the FLAPS probability surface to
     determine which points are True Positives (TP) or False Positives (FP).
+    This function is largely outdated by the simulated_sampling function.
     """
 
     county_name = nameFormat(county_name)
@@ -1191,7 +1203,7 @@ if __name__ == '__main__':
 
             #           #
             #PROBSURFACE#
-            #           # 
+            #           #
             print "Applying probability surface threshold for", state_name, \
                 county_name + "..."
             try:
@@ -1225,7 +1237,7 @@ if __name__ == '__main__':
             if num_iterations <=1 or num_iterations is None:
                 iterationNumber = None
             else:
-                for eachIteration in range(1, num_iterations+1):
+                for eachIteration in range(1, int(num_iterations)+1):
                     iterationNumber = eachIteration
 
                 #          #
@@ -1240,7 +1252,7 @@ if __name__ == '__main__':
                                                            cluster_GDB,
                                                            state_abbrev,
                                                            county_name,
-                                                           ssBins='default',
+                                                           ssBins=ssBins_matrix,
                                                            iteration=iterationNumber)
                     print "Simulated Sampling completed. " \
                           "Script duration so far:", check_time()
