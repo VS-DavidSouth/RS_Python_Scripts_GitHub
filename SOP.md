@@ -12,15 +12,15 @@ DO NOT DOUBLE CLICK OR RUN THE SCRIPT FILE WITHOUT CHECKING THAT THE PARAMETERS 
 Watch the readout, as it will print out the current step that is running and will give useful information. It is expected that each county will take about 7 minutes, so running many counties at once can take quite a while.
 It is recommended to do these in batches.
 
-### More information about the Automated_Review.py script
+### More detail about the Automated_Review.py script
 Things required to run the script: 
 1. A computer with ArcGIS 10.5 or more recent installed. Previous versions of ArcGIS may work, but they are untested. It is recommended to run this script in the IDLE program that comes with ArcGIS. 
 2. The Spatial Analyst ArcGIS extension. It needs to be installed and have at least one available license. 
 3. Batch files. These are point shapefile or feature class files which were derived from the resampled NAIP files and the model files. These files have a lot of clutter and false positives which are later removed by `Automated_Review.py`.
-        * Associated parameters: 
-          * `cluster_list`
-          * `county_outline_folder`
-        * Associated functions: 
+	* Associated parameters: 
+	  * `cluster_list`
+	  * `county_outline_folder`
+	* Associated functions: 
 	  * `clip(…)`
 	  * `add_FIPS_info(…)` which is used in the `clip(…)` and  `collapse_points(…)` functions 
 	  * `clip_buffer(…)` which is within `masking(…)` 
@@ -28,7 +28,7 @@ Things required to run the script:
 	* Associated parameters: 
 	  * `prob_surface_raster`
 	  * `prob_surface_threshold`
-        * Associated functions: 
+	* Associated functions: 
 	  * `probSurface(…)`
 5. Mask shapefiles or feature classes, along with any buffer values. Buffer values can be zero. Masks can be either negative masks (no barns will appear within this area; ex: 15m buffer from roads) or positive masks (barns will should only appear inside this area; ex: commercial land polygons). If no masks are to be used, either for neg_masks or pos_masks, follow the directions in the code for formatting. 
     * Associated parameters: 
@@ -61,7 +61,7 @@ Things required to run the script:
  	* `AR_min_threshold`
  	* `num_iterations`
 
-General structure of the script:
+### General structure of the script:
 1. Description 
 	* A general overview of the script. 
 2. Setup 
