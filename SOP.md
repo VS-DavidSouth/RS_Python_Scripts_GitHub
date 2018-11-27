@@ -98,4 +98,4 @@ Things required to run the script:
 	* In order, `clip(...)`, `LAR(...)`, `masking(...)`, `prob_surface(...)`, `collapse_points(...)`, `simulated_sampling(...)`, and `project(...)` are all used.
 	* Any errors that happen during any of the functions are saved in a list called `errors`, which is printed at the end. Be sure to check it after the script has been run.
 ## PHASE 3: APPLYING FLAPS
-    TBD
+    On a random 1-for-1 basis in the 594 high poultry counties, FLAPS locations will be swapped out for our more accurate remotely sensed locations from the Automated_Review script. This will create a dataset that has 594 US counties with points with FLAPS demographics and remotely sensed locations, and in the non-594 counties will be straight FLAPS.
