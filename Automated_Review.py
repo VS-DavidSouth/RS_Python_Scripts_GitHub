@@ -5,7 +5,7 @@
 ############################
 
 #
-# Created by David South 7/9/18, updated 11/20/18
+# Created by David South 7/9/18, updated 11/28/18
 #
 # Script Description:
 #      This script is intended for use with remotely sensed poultry data
@@ -30,14 +30,15 @@
 ############################
 # This next import gives us access to two dictionaries for
 # converting state names to abbreviations and vice versa.
-from Converting_state_names_and_abreviations import *
 import os
 import sys
 import csv
-import random
-import numpy as np
 import time
 import arcpy
+import random
+import numpy as np
+from Converting_state_names_and_abreviations import *
+
 
 start_time = time.time()
 arcpy.env.OverwriteOutput = True
@@ -77,13 +78,9 @@ regional_35_counties = [
 # determine which folders to look for Batch files in, which will be used for
 # the rest of the process. This parameter will be overwritten if
 # run_script_as_tool = True.
-cluster_list = regional_35_counties
-    #[
-     #r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst\Mississippi\BatchGDB_MS_Z16_c2.gdb',
-     #r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst\North_Carolina\BatchGDB_NC_Z17_c1.gdb',
-     #r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst\North_Carolina\BatchGDB_NC_Z18_c5.gdb',
-     #r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst\Tennessee\BatchGDB_TN_Z16_c1.gdb',
-    #]
+cluster_list = [
+    r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst\Alabama\BatchTestGDB_AL_Z16_c1.gdb'
+    ]
     
 # Specify the location of probability surface raster and the threshold.
 prob_surface_raster = r'N:\FLAPS from Chris Burdett\Data\poultry_prob_surface\poultryMskNrm\poultryMskNrm.tif'
@@ -95,7 +92,7 @@ county_outline_folder = r'N:\Remote Sensing Projects\2016 Cooperative Agreement 
 # Specify the location of the adjusted NASS values CSV.  Make sure to double
 # check that the read_adjFLAPS function to ensure it is reading the proper 
 # column.
-adjFLAPS_CSV = r'R:\Nat_Hybrid_Poultry\Documents\adjFLAPS_FINAL_CSV.csv'
+adjFLAPS_CSV = r'R:\Nat_Hybrid_Poultry\FLAPS\adjFLAPS_FINAL.csv'
 
 # Specify the location of the CSV file where the script will track which
 # counties have been completed.  If no file is present at this location,
@@ -138,15 +135,15 @@ L_min_threshold = 50
 AR_max_threshold = None
 AR_min_threshold = None
 
-# The ssBins_matrix can be specified manually. See the simulated_sampling function
+# The ss_bins_matrix can be specified manually. See the simulated_sampling function
 # for more documentation. Make sure this agrees with the prob_surface_threshold.
-# If no matrix is specified, set ssBins_matrix = 'default'.
-ssBins_matrix = 'default'
+# If no matrix is specified, set ss_bins_matrix = 'default'.
+ss_bins_matrix = 'default'
 
 # Define num_iterations. Any number >1 will result multiple several iterations
 # of the simulated_sampling and project functions, with a unique file for each.
 # If a decimal is put in here, it will be rounded down.  This can be set to None.
-num_iterations = 10
+num_iterations = 2
 
 # Use skip_list to specify that certain counties, or steps for specific counties
 # can be skipped to make processing faster. This is typically done when changes
@@ -275,14 +272,14 @@ def check_time():
 
 
 def check_parameters():
-    """This function is somewhat unpythonic, but it serves as a simple way of
-   making sure that minor errors like forgetting the [] around an entry in
+    """This function is somewhat unpythonic, but it serves as a quick and simple
+   way of ensuring minor errors like forgetting the [] around an entry in
    cluster_list won't cause strange errors that are confusing for users who
-   have little to no experience in Python.  If parameter
-   names are changed, be sure to change them in this function too!
+   have little to no experience in Python.  If parameter names change, be sure
+   to change them in this function too!
 
    To disable this function, simply remove or comment out the following line
-   in the code:
+   in the if __name__=='__main__': section of the ccode:
            check_parameters()
    """
     should_be_files = [
@@ -300,7 +297,12 @@ def check_parameters():
         (cluster_list, 'cluster_list'),
         (neg_masks, 'neg_masks'),
         (pos_masks, 'pos_masks'),
-        (skip_list, 'skip_list')
+        (skip_list, 'skip_list'),
+        ]
+    should_be_list_of_lists = [
+        (neg_masks, 'neg_masks'),
+        (pos_masks, 'pos_masks'),
+        (skip_list, 'skip_list'),
         ]
     should_be_number_or_None = [
         (prob_surface_threshold, 'prob_surface_threshold'),
@@ -335,7 +337,13 @@ def check_parameters():
         parameter = thing[0]
         param_name = thing[1]
         if not isinstance(parameter, list):
-            raise TypeError(param_name + ' needs to be a list')
+            raise TypeError(param_name + ' needs to be a list.')
+    for thing in should_be_list_of_lists:
+        parameter = thing[0]
+        param_name = thing[1]
+        for item in parameter:
+            if not isinstance(item, list):
+                raise TypeError(param_name + 'needs to be a list containing lists.')
     for thing in should_be_number_or_None:
         parameter = thing[0]
         param_name = thing[1]
@@ -794,7 +802,7 @@ def collapse_points(input_point_data, output_location, state_abbrev,
 
 
 def simulated_sampling(input_point_data, raster_dataset, output_location, state_abbrev,
-                      county_name, ssBins='default', iteration=None, random_seed=None):
+                      county_name, ss_bins='default', iteration=None, random_seed=None):
     """This function randomly forces the data into a probability distribution
     curve similar to the probability distribution found in the 'truth' data.
     It constructs several 'bins' which are based on the probSurf_1 fields
@@ -803,7 +811,7 @@ def simulated_sampling(input_point_data, raster_dataset, output_location, state_
     as was used for the prob_surface function.  Note that this function assumes
     that prob_surface_threshold = 0.1 as default.
     """
-
+    
     # Get rid of any weird characters in the state and county name
     county_name = nameFormat(county_name)
     state_name = nameFormat(state_abbrev_to_name[state_abbrev])
@@ -817,32 +825,33 @@ def simulated_sampling(input_point_data, raster_dataset, output_location, state_
 
     output_name = 'SimSampling_' + state_abbrev + '_' + county_name
     output_file_path = os.path.join(output_location, output_name)
+
+    if iteration is not None:
+        # If an iteration is specified, put a label showing that in the name.
+        # The 'i' stands for 'iteration'.
+        output_name = 'SimSampling_' + state_abbrev + '_' + county_name + '_i' + str(iteration)
+        output_file_path = os.path.join(output_location, output_name)
+
     if arcpy.Exists(output_file_path):
         if should_step_be_skipped(state_abbrev, county_name, 'SimSampling') == True:
             print "SimSampling skipped."
             return output_file_path
         else:
-            # Delete any files without '_i#'
             arcpy.Delete_management(output_file_path)
-    if iteration is not None:
-        # If an iteration is specified, put that in the name.
-        # The 'i' stands for 'iteration'.
-        output_name = 'SimSampling_' + state_abbrev + '_' + county_name + '_i' + str(iteration)
-        output_file_path = os.path.join(output_location, output_name)
-        if should_step_be_skipped(state_abbrev, county_name,
-                               'SimSampling') == True:
-            print "SimSampling skipped."
-            return output_file_path
-    # Before doing the first iteration, delete all files with the '_i' suffix.
+
+    # Before doing the first iteration, delete all old SimSampling files for that county.
+    # This is included to avoid errors of old versions floating around, for example
+    # if you ran a county with num_iterations=10, changed parameters and ran it with
+    # num_iterations=5, you would have i6-i10 still in the folder, which could be
+    # confusing and cause mistakes.
     if iteration <= 1 or iteration == None:
         walk = arcpy.da.Walk(output_location, type="Point")
         for dirpath, dirnames, filenames in walk:
             for filename in filenames:
                 if 'AutoReview' in filename or 'SimSampling' in filename:
-                    if '_i' in filename and state_abbrev in filename \
-                      and county_name in filename:
+                    if '_'+state_abbrev+'_' in filename and county_name in filename:
                         arcpy.Delete_management(os.path.join(dirpath, filename))
-                        print 'deleted:', os.path.join(dirpath, filename) # REMOVE THIS LATER
+                        print 'deleted older file:', os.path.join(dirpath, filename)
 
     # Okay, now that we have either skipped this whole function or deleted
     # outdated iterations, now we can continue.
@@ -874,37 +883,31 @@ def simulated_sampling(input_point_data, raster_dataset, output_location, state_
                 #
                 # BE SURE TO DOUBLE CHECK THAT IT IS READING THE RIGHT COLUMN!
                 # This could cause many errors.
-                if nameFormat(row[1]).title() == state_name.title() \
-                  and nameFormat(row[2]).title() == county_name.title():
-                    adjFLAPS = row[8]
+
+                # This finds the state name of the row, which is something like
+                # 'Alabama\Barbour', but slices it so that we only get the 'Alabama'
+                # part. Likewise for temp_county_name, but we get 'Barbour'.
+                temp_state_name = row[1][:row[1].find('\\')]
+                temp_county_name = row[1][row[1].find('\\')+1:]
+                if nameFormat(temp_state_name).title() == state_name.title() \
+                  and nameFormat(temp_county_name).title() == county_name.title():
+                    adjFLAPS_value = row[6]
                     
                     return adjFLAPS_value
 
-                # If there are no values in the 2nd or 3rd column, check in the
-                # 12th column.
-                elif row[1] == '' and row[2] == '':
-                    # Note that \\ is used instead of \, this is because \ has
-                    # special meaning in Python so you must use \\ to
-                    # represent \. In this case, \ is the divider between the
-                    # state name and county name in column 12 (index 11) in the CSV.
-                    tempIndex = row[11].find('\\')
-                    # These following two temp names are basically the value in
-                    # column 12 (index 11) sliced with the \ as the dividing line.
-                    tempStateName = nameFormat(row[11][:tempIndex]).title()
-                    tempCountyName = nameFormat(row[11][tempIndex+1:]).title()
-
-                    if tempStateName == state_name.title() and tempCountyName == county_name.title():
-                        adjFLAPS_value = row[16]
-                        return adjFLAPS_value
+                # Devel note: In the future, it would be good to switch this so that
+                # it uses FIPS codes throughout the script, not the county and
+                # state (or state abbreviation) combo that the script uses currently.
+                
 
     adjFLAPS = read_adjFLAPS(adjFLAPS_CSV)
-    print "----Total number of points to select:", adjFLAPS ## REMOVE THIS LATER
+    print "----Total number of points to select:", adjFLAPS
 
     #                #
     ### SETUP BINS ###
     #                #
-    # Note that ssBins stands for simulated sampling bins.
-    if ssBins == 'default' and prob_surface_threshold == 0.1:
+    # Note that ss_bins stands for simulated sampling bins.
+    if ss_bins == 'default' and prob_surface_threshold == 0.1:
         # Column 1 is the numeric label for each bin.
         # Columns 2 and 3 are the lower and upper values for that
         # particular bin, respectively.
@@ -912,7 +915,7 @@ def simulated_sampling(input_point_data, raster_dataset, output_location, state_
         # that bin.
         # Column 5 will be filled later with the number of points that should
         # actually be drawn from that bin.
-        ssBins = (
+        ss_bins = (
                   (1, 0.1, 0.2, 3.88),
                   (2, 0.2, 0.3, 7.69),
                   (3, 0.3, 0.4, 11.95),
@@ -923,25 +926,25 @@ def simulated_sampling(input_point_data, raster_dataset, output_location, state_
                   (8, 0.8, 0.9, 2.23),
                   (9, 0.9, 1.0, 0.09),
                   )
-    elif ssBins == 'default' and not prob_surface_threshold == 0.1:
-        raise Exception("Error: please provide ssBins values that fit with a prob_surface_threshold of %s" %str(prob_surface_threshold) )
+    elif ss_bins == 'default' and not prob_surface_threshold == 0.1:
+        raise Exception("Error: please provide ss_bins values that fit with a prob_surface_threshold of %s" %str(prob_surface_threshold) )
 
-    # Change ssBins to a numpy array.
-    ssBins = np.array(ssBins)
+    # Change ss_bins to a numpy array.
+    ss_bins = np.array(ss_bins)
     
     # Add column 5 to array, then fill it with the proper number of points to
     # draw from that bin, calculated as the column 3 percentage times adjFLAPS
     # total for that county. Start by filling it with meaningless zeros:
-    ssBins = np.insert(ssBins, 4, np.zeros(len(ssBins)), axis=1)
-    for row in ssBins:
+    ss_bins = np.insert(ss_bins, 4, np.zeros(len(ss_bins)), axis=1)
+    for row in ss_bins:
         # Now actually fill column 5 with a rounded number of points to
         # draw from that bin.
         row[4] = round( float(row[3])/100. * float(adjFLAPS), 0)
         print '----' + str(int(row[0])),'points:', str(row[4])
 
-    if not round(sum(ssBins[:,3]),1) == 100.0:
+    if not round(sum(ss_bins[:,3]),1) == 100.0:
         # If the percentages don't total to really close to 100%, raise hell.
-        raise Exception("Error: please provide ssBins values that total to 100 percent")
+        raise Exception("Error: please provide ss_bins values that total to 100 percent")
 
     # Add a new field to the input data to hold the bin information in.
     arcpy.AddField_management(in_table=output_file_path, field_name="Bin",
@@ -955,7 +958,7 @@ def simulated_sampling(input_point_data, raster_dataset, output_location, state_
         for row in cursor:
             ProbSurf_1 = row[1]
             
-            for binThresholds in ssBins:
+            for binThresholds in ss_bins:
                 # Classify the point based on which of the bin max and min
                 # categories that it fits within.
                 if ProbSurf_1 > binThresholds[1] and ProbSurf_1 <= binThresholds[2]:
@@ -971,7 +974,7 @@ def simulated_sampling(input_point_data, raster_dataset, output_location, state_
     # the output.
     selected_points = []
                 
-    for specificBin in ssBins:
+    for specific_bin in ss_bins:
         # Create a list that contains the pool of points for that bin that we
         # will draw random points out of.
         pointsPool = []
@@ -980,11 +983,11 @@ def simulated_sampling(input_point_data, raster_dataset, output_location, state_
             for row2 in cursor2:
                 # Check to see if the point matches the current bin label,
                 # if so, add it to pointsPool so it can be drawn out later.
-                if row2[2] == specificBin[0]:
+                if row2[2] == specific_bin[0]:
                     pointsPool.append(row2)
                     
         # Randomly select (from the pointsPool list) a number of points equal
-        # to the value in the 5th column (index 4) of ssBins.
+        # to the value in the 5th column (index 4) of ss_bins.
         try:
             if random_seed is not None:
                 random.seed(random_seed)
@@ -992,13 +995,13 @@ def simulated_sampling(input_point_data, raster_dataset, output_location, state_
             # without replacement, meaning that once a point is drawn, it
             # cannot be drawn out again. You will never get duplicates of the
             # same point.
-            selected_points.append(random.sample(pointsPool, int(specificBin[4])) )
+            selected_points.append(random.sample(pointsPool, int(specific_bin[4])) )
 
         # If there are too few points in that pool, select them all instead of
         # taking some random points.
         except ValueError:
             print "Welp, guess we gotta take all the points for category", \
-                int(specificBin[0])
+                int(specific_bin[0])
             selected_points.append(pointsPool)
 
     # Create a list of just the OBJECTID values, which will be used to delete points.
@@ -1235,10 +1238,18 @@ if __name__ == '__main__':
 
             # Note: this sets up a loop, running for each iteration.
             if num_iterations <=1 or num_iterations is None:
-                iterationNumber = None
-            else:
-                for eachIteration in range(1, int(num_iterations)+1):
-                    iterationNumber = eachIteration
+                # Set num_iterations to 1 to show that simulated sampling should be done
+                # only once.
+                num_iterations = 1
+
+            for each_iteration in range(1, int(num_iterations)+1):
+                # If we only are doing simulated sampling once, we should specify to the
+                # function that it doesn't need to label things with '_i3', etc.
+                if num_iterations == 1:
+                    iteration_number = None
+                else:
+                    # If we are doing multiple iterations, label each one.
+                    iteration_number = each_iteration
 
                 #          #
                 #SIMULATED #
@@ -1252,8 +1263,8 @@ if __name__ == '__main__':
                                                            cluster_GDB,
                                                            state_abbrev,
                                                            county_name,
-                                                           ssBins=ssBins_matrix,
-                                                           iteration=iterationNumber)
+                                                           ss_bins=ss_bins_matrix,
+                                                           iteration=iteration_number)
                     print "Simulated Sampling completed. " \
                           "Script duration so far:", check_time()
                 except Exception:
@@ -1271,13 +1282,13 @@ if __name__ == '__main__':
                 try:
                     auto_review_file = project(sim_sampling_file, cluster_GDB,
                                                UTM, state_abbrev, county_name,
-                                               iteration=iterationNumber)
+                                               iteration=iteration_number)
                     if track_completed_counties == True:
                         mark_county_as_completed(cluster_GDB,
                                                  progress_tracking_file,
                                                  state_abbrev,
                                                  county_name,
-                                                 iteration=iterationNumber)
+                                                 iteration=iteration_number)
                     print "Projected. Script duration so far:", check_time()
                 except Exception:
                     e = sys.exc_info()[1]
@@ -1290,7 +1301,7 @@ if __name__ == '__main__':
             if save_intermediates == False:
                 delete_intermediates(intermed_list)
                 
-            print ''  # This just puts a blank line between each county.
+            print ''  # This just prints a blank line between each county.
 
 ###############################################################################
     ############################
