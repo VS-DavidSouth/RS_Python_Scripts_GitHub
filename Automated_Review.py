@@ -135,6 +135,12 @@ L_min_threshold = 50
 AR_max_threshold = None
 AR_min_threshold = None
 
+# Define the maximum distance (in Meters) that two barns/points can be apart
+# from each other to still be considered one barn. Anything at this distance
+# or less will be moved to a centroid and combined into a single point.  The
+# number of points collapsed this way will be saved in the ICOUNT field.
+clust_tolerance = 100
+
 # The ss_bins_matrix can be specified manually. See the simulated_sampling function
 # for more documentation. Make sure this agrees with the prob_surface_threshold.
 # If no matrix is specified, set ss_bins_matrix = 'default'.
@@ -143,7 +149,7 @@ ss_bins_matrix = 'default'
 # Define num_iterations. Any number >1 will result multiple several iterations
 # of the simulated_sampling and project functions, with a unique file for each.
 # If a decimal is put in here, it will be rounded down.  This can be set to None.
-num_iterations = 2
+num_iterations = 10
 
 # Use skip_list to specify that certain counties, or steps for specific counties
 # can be skipped to make processing faster. This is typically done when changes
@@ -311,6 +317,7 @@ def check_parameters():
         (AR_max_threshold, 'AR_max_threshold'),
         (AR_min_threshold, 'AR_min_threshold'),
         (num_iterations, 'num_iterations')
+        (clust_tolerance, 'clust_tolerance')
         ]
     for thing in should_be_files:
         parameter = thing[0]
@@ -784,7 +791,7 @@ def collapse_points(input_point_data, output_location, state_abbrev,
 
     # The input file path to the Integrate tool NEEDS to have no spaces in it,
     # otherwise it will cause frustratingly vague errors.
-    arcpy.Integrate_management(in_features=tempIntegrateFile, cluster_tolerance="100 Meters")
+    arcpy.Integrate_management(in_features=tempIntegrateFile, cluster_tolerance="%s Meters" %str(clust_tolerance) )
 
     # Collapse points that are on top of each other to single points.
     arcpy.CollectEvents_stats(Input_Incident_Features=tempIntegrateFile,
