@@ -39,6 +39,7 @@ Things required to run the script:
 6. A CSV file for Adjusted FLAPS. This involves taking raw FLAPS output for Pullets, Layers and Turkeys and deleting all points below a threshold (400 birds, 1000 birds, etc) to eliminate any 'backyard' farms that are not large scale production facilities.  The CSV should have farm totals for each county, which will be used to determine how many points should be selected during the simulatedSampling(…) function. 
 	* Associated parameters: 
 	  * `adjFLAPS_CSV`
+	  * `ss_bins_matrix`
 	* Associated functions: 
 	  * `simulated_sampling(…)`
 7. A location for the tracking file. It is not necessary to create a CSV file at this location, the script will create a blank one and fill it if needed. Optionally, this can be turned off by setting `track_completed_counties = False`.
@@ -60,6 +61,7 @@ Things required to run the script:
  	* `AR_max_threshold`
  	* `AR_min_threshold`
  	* `num_iterations`
+	* `clust_tolerance`
 
 ### General structure of the script:
 1. Description 
