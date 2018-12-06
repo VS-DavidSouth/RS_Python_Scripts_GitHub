@@ -59,16 +59,13 @@ states2do = [
     ]
 
 
-def create_state_GDBs(outputFolder, state_list):
-    ##
-    ## Input Variables:
-    ##      outputFolder: the file location to put all the GDBs into
-    ##      state_list: a list object containing abbreviations for all
-    ##                   the states that need GDBs created
-    ##
-    ## Returns:
-    ##      none
-    ##
+def create_state_GDBs(output_folder, state_list):
+    '''
+
+    :param output_folder: The file location to put all the GDBs into.
+    :param state_list: A list object containing abbreviations for all the states that need GDBs created.
+    :return: N/A
+    '''
 
     ## Loop for each state
     for state_name in state_list:
@@ -80,11 +77,11 @@ def create_state_GDBs(outputFolder, state_list):
         print ("Creating geodatabase for %s..." % state_name)
 
         # Check to see if the gdb already exists
-        if not arcpy.Exists(os.path.join(outputFolder, GDB + '.gdb')):  ## See if this geodatabase already exists
+        if not arcpy.Exists(os.path.join(output_folder, GDB + '.gdb')):  ## See if this geodatabase already exists
 
             try:
                 ## If the gdb doesn't already exist, create new geodatabase for that state
-                arcpy.CreateFileGDB_management(out_folder_path=outputFolder, \
+                arcpy.CreateFileGDB_management(out_folder_path=output_folder, \
                                                out_name=GDB, out_version="CURRENT")
                 print "GDB created."
 
@@ -95,22 +92,33 @@ def create_state_GDBs(outputFolder, state_list):
             print ("Geodatabase already exists for %s." % state_name)
 
 
-def walk_folder(folderLocation):
-    walk = arcpy.da.Walk(folderLocation, type="Point")
+def walk_folder(folder_location):
+    '''
+    This function finds all Batch files in the folder it is pointed at.
+    :param folder_location: The folder where the Batch files are stored.
+    :return: A list of the file paths of all Batch files.
+    '''
+    walk = arcpy.da.Walk(folder_location, type="Point")
 
-    walkList = []   # This will hold all of the file paths to the files within the folder
+    walk_list = []   # This will hold all of the file paths to the files within the folder
 
     for dirpath, dirnames, filenames in walk:
         for filename in filenames:
             if filename[:6] == 'Batch_':
                 if 'ModelGDB' not in dirpath:
                     if 'TestGDB' not in dirpath:
-                        walkList.append(os.path.join(dirpath, filename))
+                        walk_list.append(os.path.join(dirpath, filename))
 
-    return walkList
+    return walk_list
 
 
 def transfer_to_GDB(target_file, output_GDB):
+    '''
+    This function copies over the target_file and puts it in the output_GDB.
+    :param target_file: Any ArcGIS feature class file.
+    :param output_GDB: Output file path to GDB.
+    :return: N/A
+    '''
     file_name = os.path.basename(target_file)
 
     if arcpy.Exists(os.path.join(output_GDB, file_name)):
