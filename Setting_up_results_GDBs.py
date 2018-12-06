@@ -9,6 +9,7 @@
 
 import os
 import arcpy
+from Automated_Review import check_time
 from Converting_state_names_and_abreviations import *
 
 # PARAMETERS #
@@ -133,9 +134,12 @@ def transfer_to_GDB(target_file, output_GDB):
 
 if __name__ == '__main__':
     #create_state_GDBs(results_folder, states2do)
+    print "The script has taken", check_time(), "so far."
 
     print "Finding all Batch files..."
     all_batch_files = walk_folder(batch_files_location)
+    print "All Batch files found. The script has taken", check_time(), "so far."
+    print "Beginning to transfer Batch files."
     for batch_file in all_batch_files:
         batch_name = os.path.basename(batch_file)
         state_abbrev = batch_name[6:8]
@@ -143,5 +147,6 @@ if __name__ == '__main__':
         state_GDB = os.path.join(results_folder, state_name + '.gdb')
         transfer_to_GDB(batch_file, state_GDB)
 
+    print "/n/nThe script took", check_time(), "to run."
     print "Total Batch files:", len(all_batch_files)
     print "~~~~~~~~~~~~SCRIPT COMPLETED~~~~~~~~~~~~"

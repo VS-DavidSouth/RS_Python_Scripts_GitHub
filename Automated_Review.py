@@ -263,7 +263,8 @@ centralMeridian = {10: '-123.0', 11: '-117.0', 12: '-111.0', 13: '-105.0',
 #
 
 def check_time():
-    """This function returns a string of how many minutes or hours the script
+    """
+    :return: This function returns a string of how many minutes or hours the script
     has run so far.
     """
 
@@ -278,7 +279,8 @@ def check_time():
 
 
 def check_parameters():
-    """This function is somewhat unpythonic, but it serves as a quick and simple
+    """
+    This function is somewhat unpythonic, but it serves as a quick and simple
    way of ensuring minor errors like forgetting the [] around an entry in
    cluster_list won't cause strange errors that are confusing for users who
    have little to no experience in Python.  If parameter names change, be sure
