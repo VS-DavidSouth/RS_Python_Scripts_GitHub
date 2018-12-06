@@ -143,7 +143,7 @@ if __name__ == '__main__':
     for batch_file in all_batch_files:
         batch_name = os.path.basename(batch_file)
         state_abbrev = batch_name[6:8]
-        state_name = state_abbrev_to_name[state_abbrev]
+        state_name = nameFormat(state_abbrev_to_name[state_abbrev])
         state_GDB = os.path.join(results_folder, state_name + '.gdb')
         transfer_to_GDB(batch_file, state_GDB)
 
