@@ -8,6 +8,7 @@
 #
 
 import os
+import arcpy
 from Converting_state_names_and_abreviations import *
 
 # PARAMETERS #
@@ -101,8 +102,10 @@ def walk_folder(folderLocation):
 
     for dirpath, dirnames, filenames in walk:
         for filename in filenames:
-            if filename[:7] == 'Batch_' and 'ModelGDB' not in dirpath and 'TestGDB' not in dirpath:
-                walkList.append(os.path.join(dirpath, filename))
+            if filename[:6] == 'Batch_':
+                if 'ModelGDB' not in dirpath:
+                    if 'TestGDB' not in dirpath:
+                        walkList.append(os.path.join(dirpath, filename))
 
     return walkList
 
@@ -114,20 +117,23 @@ def transfer_to_GDB(target_file, output_GDB):
         print file_name, "already exists."
         return
     else:
-        arcpy.FeatureClassToFeatureClass_conversion(in_features=batch_file, out_path=output_GDB, out_name=file_name)
+        arcpy.FeatureClassToFeatureClass_conversion(in_features=batch_file,
+                                                    out_path=output_GDB,
+                                                    out_name=file_name)
         print "Copied:", file_name
 
 
 if __name__ == '__main__':
-    create_state_GDBs(results_folder, states2do)
+    #create_state_GDBs(results_folder, states2do)
 
+    print "Finding all Batch files..."
     all_batch_files = walk_folder(batch_files_location)
     for batch_file in all_batch_files:
         batch_name = os.path.basename(batch_file)
-        state_abbrev = batch_name[6:9]
+        state_abbrev = batch_name[6:8]
         state_name = state_abbrev_to_name[state_abbrev]
         state_GDB = os.path.join(results_folder, state_name + '.gdb')
-        transfer_to_GDB(batch_file, output_GDB)
+        transfer_to_GDB(batch_file, state_GDB)
 
     print "Total Batch files:", len(all_batch_files)
     print "~~~~~~~~~~~~SCRIPT COMPLETED~~~~~~~~~~~~"
