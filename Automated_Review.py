@@ -1104,6 +1104,20 @@ def delete_intermediates(intermed_list):
             print "error deleting the following file:\n" + intermed_file
 
 
+def clear_GDB(folder):
+    
+    print "\nClearing GDBs. This does not affect Batch files."
+    walk = arcpy.da.Walk(folder, type="Point")
+    for dirpath, dirnames, filenames in walk:
+            for file_name in filenames:
+                    if 'AutoReview_' in file_name or 'Clip_' in file_name
+                    or 'CollectEvents_'in file_name or 'Integrate_' in file_name
+                    or 'Masking_' in file_name or 'LAR_' in file_name
+                    or 'ProbSurf_' in file_name or 'SimSampling_' in file_name:
+                            print "Deleting:", file_name
+                            arcpy.Delete_management(os.path.join(dirpath, file_name))
+
+
 ############################
 ######### DO STUFF #########
 ############################
