@@ -251,7 +251,6 @@ def check_time():
     :return: This function returns a string of how many minutes or hours the script
     has run so far.
     """
-
     time_so_far = time.time() - start_time
     time_so_far /= 60     # changes this from seconds to minutes
     
@@ -273,6 +272,7 @@ def check_parameters():
    To disable this function, simply remove or comment out the following line
    in the if __name__=='__main__': section of the ccode:
            check_parameters()
+    :return: None
    """
     should_be_files = [
         (prob_surface_raster, 'prob_surface_raster'),
@@ -348,8 +348,13 @@ def check_parameters():
     
 
 def should_step_be_skipped(state_abbrev, county_name, step_name):
-    """This function returns either True or False, based on whether
+    """
+    This function returns either True or False, based on whether
     the specified county is in skip_list.
+    :param state_abbrev: Two-digit uppercase letter code of the relevant state as a string.
+    :param county_name: The name of the relevant county as a string.
+    :param step_name: The string key to the step to be skipped. See skip_list for documentation.
+    :return: Boolean.
     """
     for skip_item in skip_list:
         if skip_item[0] == state_abbrev:
@@ -364,8 +369,9 @@ def should_step_be_skipped(state_abbrev, county_name, step_name):
 
 
 def find_batch(cluster_GDB):
-    """This function finds all the point files in the target GDB
-    and returns them in the form of a list.
+    """
+    :param cluster_GDB: A file path to a GDB or folder with point feature classes or shapefiles within.
+    :return: A list of file paths of all point files within cluster_GDB.
     """
     # walk_list will hold the file paths to the Batch files within the folder.
     walk_list = []
@@ -386,7 +392,11 @@ def find_batch(cluster_GDB):
 
 
 def find_FIPS_UTM(county_file):
-    """This determines the appropriate UTM and FIPS code values for the county.
+    """
+    This determines the appropriate UTM and FIPS code values for the county.
+    :param county_file: File path to a feature class (or similar) ArcGIS file that contains all
+    relevant counties and their UTM and FIPS information.
+    :return: FIPS code as a string, UTM code as a string
     """
     with arcpy.da.SearchCursor(county_file, ['FIPS', 'UTM',]) as cursor:
         for row in cursor:
@@ -395,10 +405,13 @@ def find_FIPS_UTM(county_file):
 
 def add_FIPS_info(input_feature, state_abbrev, county_name):
     """
-    This adds the FIPS value (from the find_FIPS_UTM function) to a given
+    This function adds the FIPS value (from the find_FIPS_UTM function) to a given
     shapefile.
+    :param input_feature: The file path to a feature class or shapefile.
+    :param state_abbrev: Two-digit uppercase letter code of the relevant state as a string.
+    :param county_name: The name of the relevant county as a string.
+    :return: None
     """
-
     # The following several lines are to check to see if the FIPS or FIPS2
     # fields exist. First, creates a list of all fields in that feature class:
     field_list = [field.name for field in arcpy.ListFields(input_feature)]
@@ -453,10 +466,17 @@ def add_FIPS_info(input_feature, state_abbrev, county_name):
 
 def clip(input_feature, clip_files, output_location, 
          state_abbrev, county_name):
-    """This function clips the input features and names everything properly,
-    as well as adding FIPS information.
     """
-
+    This function clips the Batch file to the county outline. It also adds FIPS
+    information.
+    :param input_feature: The Batch point feature class.
+    :param clip_files: A file path or list of file paths of feature classes to use
+    to clip the Batch file. This should probably be the county outlien feature class.
+    :param output_location: File path where the clipped file will be saved.
+    :param state_abbrev: Two-digit uppercase letter code of the relevant state as a string.
+    :param county_name: The name of the relevant county as a string.
+    :return: The file path to the newly created clipped file.
+    """
     # Get rid of any weird characters in the county name.
     county_name = nameFormat(county_name)
     
@@ -488,10 +508,18 @@ def clip(input_feature, clip_files, output_location,
     
 def LAR(input_feature, output_location, LAR_thresholds,
         state_abbrev, county_name):
-    """LAR stands for Length(L) and Aspect Ratio(AR). This function
-    deletes points that do not conform with L or AR thresholds.
     """
-
+    This function applies strict LAR thresholds, removing points from the
+    input point feature class. LAR stands for Length(L) and Aspect Ratio(AR).
+    This function deletes points that do not conform with L or AR thresholds.
+    :param input_feature: Point feature class that was derived from the Batch file.
+    :param output_location: File path where the LAR file will be saved.
+    :param LAR_thresholds: A list of 4 parameters, likely given in the LAR_thresolds
+    global variable.
+    :param state_abbrev: Two-digit uppercase letter code of the relevant state as a string.
+    :param county_name: The name of the relevant county as a string.
+    :return: The file path to the newly created LAR file.
+    """
     L_max_threshold =  LAR_thresholds [0][0]
     L_min_threshold =  LAR_thresholds [0][1]
     AR_max_threshold = LAR_thresholds [1][0]
@@ -555,18 +583,27 @@ def LAR(input_feature, output_location, LAR_thresholds,
     
 def masking(input_feature, output_location, state_abbrev, county_name,
             county_outline, neg_masks=[], pos_masks=[]):
-    """This function uses the Erase tool to remove any points with a set 
+    """
+    This function uses the Erase tool to remove any points with a set
     distance of the files in the neg_masks list.  It also uses the Clip
-    tool to remove any points that are NOT within a set distance of files in 
+    ArcGIS tool (NOT the same as the clip(...) function in this script)
+    to remove any points that are NOT within a set distance of files in
     the pos_masks list.
-    
+
     Both neg_masks (negative masks) and pos_masks (positive masks) should
     look similar to this, with # representing the buffer distance in Meters:
           [[r'C:\file_path\file', #],
            [r'C:\alt_file_path\file2', #]]
+    :param input_feature: Point feature class that was derived from the Batch file.
+    :param output_location: The file path where the masking output will be saved.
+    :param state_abbrev: Two-digit uppercase letter code of the relevant state as a string.
+    :param county_name: The relevant county name as a string.
+    :param county_outline: The file path to the county outline feature class, used to clip the masks.
+    :param neg_masks: The file path and buffer distance in Meters for that mask. See above for formatting.
+    :param pos_masks: The file path and buffer distance in Meters for that mask. See above for formatting.
+    :return: The file path to the newly created masked point feature class.
     """
-
-    # If both neg_masks and pos_masks are default (empty), then simply pass 
+    # If both neg_masks and pos_masks are default (empty), then simply pass
     # the input_feature out of the function.
     if neg_masks == [] and pos_masks == []:
         return input_feature
@@ -583,10 +620,17 @@ def masking(input_feature, output_location, state_abbrev, county_name,
             arcpy.Delete_management(output_file_path)
 
     def clip_buffer(mask, temp_location, county_outline):
-        """This function is a small thing to clip the mask file to the county
+        """
+        This function is a small thing to clip the mask file to the county
         to chop it into a manageable size. The file is buffered if required.
-        This function is used for each mask. This mini-function is not for
-        clipping or erasing the point file input data.
+        This function is used for each mask. This mini-function is NOT for
+        clipping or erasing the point file input data and only deals with
+        mask files themselves.
+        :param mask: A single element from either neg_masks or pos_masks, in the form of a list with a
+        file path and a integer (or similar number) buffer distance.
+        :param temp_location: File path to place the temprorary clipped mask file.
+        :param county_outline: The file path to the relevant county feature class file.
+        :return: The file path to the newly created clipped and buffered mask file.
         """
         # This is where the temporary clipped file will be stored.
         clip_temp = os.path.join(temp_location, 'clipped_mask_temp')
@@ -688,13 +732,18 @@ def masking(input_feature, output_location, state_abbrev, county_name,
 
 def add_raster_info(point_data_to_alter, raster_dataset,
                     field_name_1='ProbSurf_1', field_name_2='ProbSurf_2'):
-    """This function extracts the values from the input raster
+    """
+    This function extracts the values from the input raster
     raster and creates two new fields in the input feature class,
     called ProbSurf_1 and ProbSurf_2 respectively. ProbSurf_1 has
     no interpolation, ProbSurf_2 has bilinear interpolation.
     Note: THIS FUNCTION CHANGES THE INPUT FEATURE CLASS BY ADDING FIELDS.
+    :param point_data_to_alter: File path to a feature class file.
+    :param raster_dataset:  File path for the raster file in an ArcGIS format.
+    :param field_name_1: Name of the field in the raster that data will be taken from, as a string.
+    :param field_name_2: Name of the second field in the raster that data will be taken from, as a string.
+    :return: None.
     """
-
     # Allow the script to access the Spatial Analyst ArcGIS extension.
     arcpy.CheckOutExtension("Spatial")
     
@@ -708,6 +757,17 @@ def add_raster_info(point_data_to_alter, raster_dataset,
 
 def prob_surface(input_point_data, raster_dataset, output_location,
                 state_abbrev, county_name):
+    """
+    This function reduces false positives in the Batch file ("clutter") by
+    removing points that exist at locations that are below the specified threshold
+    on the probability surface raster from FLAPS.
+    :param input_point_data: Point feature class that was derived from the Batch file.
+    :param raster_dataset: File path to the probability surface raster from FLAPS.
+    :param output_location: File path where output feature class will be saved.
+    :param state_abbrev: Two-digit uppercase letter code of the relevant state as a string.
+    :param county_name: The name of the relevant county as a string.
+    :return: The file path to the newly created feature class.
+    """
     """This function exists to replace the Manual Review step of the regional
     remote sensing procedure. It uses the FLAPS probability surface to
     determine which points are True Positives (TP) or False Positives (FP).
@@ -747,13 +807,22 @@ def prob_surface(input_point_data, raster_dataset, output_location,
 
 def collapse_points(input_point_data, output_location, state_abbrev,
                    county_name):
-    """This function creates a new file and uses the Integrate and CollectEvents
-    ArcGIS tools to collapse input points within 100m of each other to
-    single points. Note: The Integrate tool is really finicky about the
-    file paths having spaces in them. It will cause vague errors if there
-    are spaces or special characters in the file paths. Don't do it.
     """
-    
+    This function creates a new file and uses the Integrate and CollectEvents
+    ArcGIS tools to collapse input points within 100m of each other to
+    single points.
+
+    BEWARE - The Integrate tool is really finicky about the
+    file paths having spaces in them. It will cause vague errors if there
+    are spaces or special characters in the file paths. Don't put blank
+    spaces in your file paths. Don't do it. Like that creepy child you keep
+    seeing in your basement, it will come back to haunt you.
+    :param input_point_data: Point feature class that was derived from the Batch file.
+    :param output_location: The file path where the shiny new feature class will be saved.
+    :param state_abbrev: Two-digit uppercase letter code of the relevant state as a string.
+    :param county_name: The name of the relevant county as a string.
+    :return:
+    """
     # Get rid of any weird characters in the county name.
     county_name = nameFormat(county_name)
     state_name = nameFormat(state_abbrev_to_name[state_abbrev])
@@ -796,15 +865,28 @@ def collapse_points(input_point_data, output_location, state_abbrev,
 
 def simulated_sampling(input_point_data, raster_dataset, output_location, state_abbrev,
                       county_name, ss_bins='default', iteration=None, random_seed=None):
-    """This function randomly forces the data into a probability distribution
+    """
+    This function randomly forces the data into a probability distribution
     curve similar to the probability distribution found in the 'truth' data.
     It constructs several 'bins' which are based on the probSurf_1 fields
     of the input_point_data file, then deletes all but the specified number
-    points from that bin. Ensure that the 'raster_dataset' used here is the same
-    as was used for the prob_surface function.  Note that this function assumes
-    that prob_surface_threshold = 0.1 as default.
+    points from that bin. It is generally assumed that 'raster_dataset' used
+    here is the same as was used for the prob_surface function.
+
+    Note that this function assumes that prob_surface_threshold = 0.1 as default.
+    If this isn't the case, be sure to specify a custom ss_bins matrix.
+    :param input_point_data: Point feature class that was derived from the Batch file.
+    :param raster_dataset: File path to a raster dataset in ArcGIS format.
+    :param output_location: The file path that dictates where to save this marvelous output file.
+    :param state_abbrev: Two-digit uppercase letter code of the relevant state as a string.
+    :param county_name: The name of the relevant county as a string.
+    :param ss_bins: An optional parameter that can be used to specify the probability matrix.
+    See the `if ss_bins == 'default':` section below for more details and formatting.
+    :param iteration: Optional parameter, either None or a number like a float or integer.
+    This will be put in the file name.
+    :param random_seed: Optional parameter, can be used to specify a random seed for repeatablility. Integer.
+    :return: The output file path of the file that was recently outputed to that output file path.
     """
-    
     # Get rid of any weird characters in the state and county name
     county_name = nameFormat(county_name)
     state_name = nameFormat(state_abbrev_to_name[state_abbrev])
@@ -862,10 +944,13 @@ def simulated_sampling(input_point_data, raster_dataset, output_location, state_
     ### SETUP TO READ FROM adjFLAPS FILE ###
     #                                      #
     def read_adjFLAPS(adjFLAPS_CSV):
-        """This funtion reads the adjFLAPS_CSV file and returns the adjusted
-        FLAPS value.
         """
-
+        This function reads the adjFLAPS_CSV file and returns the adjusted
+        FLAPS value. This is used to determine how many total points should be
+        selected during Simulated Sampling.
+        :param adjFLAPS_CSV: File path to the csv file containing the adjFLAPS values.
+        :return: The value from the CSV of the appropriate county as a string.
+        """
         with open(adjFLAPS_CSV) as csv_file:
             reader = csv.reader(csv_file, delimiter=',')
             for row in reader:
@@ -1023,10 +1108,17 @@ def simulated_sampling(input_point_data, raster_dataset, output_location, state_
 
 def project(input_data, output_location, UTM_code, state_abbrev,
             county_name, iteration=None):
-    """This function projects the input from the UTM county projection into
-    WGS 1984 Geographic Coordinate System.
     """
-
+    This function projects the input from the UTM county projection into
+    WGS 1984 Geographic Coordinate System.
+    :param input_data: Point feature class that was derived from the Batch file.
+    :param output_location: The file path  where the final output of this script will be saved.
+    :param UTM_code: The UTM code, in string form, from the input coordinate system.
+    :param state_abbrev: Two-digit uppercase letter code of the relevant state as a string.
+    :param county_name: The name of the county as a string.
+    :param iteration: None, or the iteration value, either as an integer or string.
+    :return: The output file path for the final resting place of this script, projected and pretty.
+    """
     # Get rid of any weird characters in the county name.
     county_name = nameFormat(county_name)
 
@@ -1069,34 +1161,43 @@ def project(input_data, output_location, UTM_code, state_abbrev,
         return output_file_path
 
 
-def mark_county_as_completed(cluster_GDB, progress_tracking_file, state_abbrev,
+def mark_county_as_completed(progress_tracking_file, state_abbrev,
                           county_name, iteration=None):
-    """This function edits a CSV and fills in which counties have been
-    completed so far.
     """
-
+    This function edits a CSV and can be used to keep track of which counties have been
+    completed so far. It will create a new CSV if there isn't one at the
+    progress_tracking_file location. This function is entirely optional.
+    :param progress_tracking_file: File path to the csv file where the infomration will be stored.
+    :param state_abbrev: Same as the last 400 state_abbrev arguments in other functions.
+    :param county_name: This should be pretty self-explanatory at this point.
+    :param iteration: Iteration number. Not super important.
+    :return: None.
+    """
     state_name = nameFormat(state_abbrev_to_name[state_abbrev])
     county_name = nameFormat(county_name)
-    
+
+    # time_value saved in case it is required in the future.
     time_value = str( int( round(time.time(), 0) ) )
 
     if iteration is None:
-            iterationValue = None
+            iteration_value = None
     else:
-            iterationValue = 'i' + str(iteration)
+            iteration_value = 'i' + str(iteration)
     
     with open(progress_tracking_file, 'ab') as g:
         writer = csv.writer(g, dialect='excel')
-        writer.writerow([state_name, county_name, iterationValue])
+        writer.writerow([state_name, county_name, iteration_value])
 
 
 def delete_intermediates(intermed_list):
-    """This function is designed to be used in the other functions
+    """
+    This function is designed to be used in the other functions
     whenever they have any intermediate files. It will delete
     all files that are in list format in the intermed_list
-    input. (intermed is short for intermediate)
+    input. `intermed` is short for intermediate.
+    :param intermed_list: A list of file paths which are doomed to be deleted and to android hell.
+    :return: None.
     """
-
     for intermed_file in intermed_list:
         try:
             arcpy.Delete_management(intermed_file)
@@ -1105,17 +1206,28 @@ def delete_intermediates(intermed_list):
 
 
 def clear_GDB(folder):
-    
+    """
+    This function clears out all files with items in nope_list
+    in their name. Do not use this function unless you are positive
+    of what it is going to delete. Once you delete something, its gone.
+    Or you have to pay thousands of dollars for data recovery, and it
+    might not even work. Remember that.
+
+    This function will not delete any `Batch` files.
+    :param folder: The folder that you want to clear the outdated clutter from.
+    :return: None.
+    """
     print "\nClearing GDBs. This does not affect Batch files."
+
+    # Any files with an item from this list in the name gets deleted.
+    nope_list = ['AutoReview_', 'Clip_', 'CollectEvents_', 'Integrate_',
+                 'Masking_', 'LAR_', 'ProbSurf_', 'SimSampling_',]
     walk = arcpy.da.Walk(folder, type="Point")
     for dirpath, dirnames, filenames in walk:
             for file_name in filenames:
-                    if 'AutoReview_' in file_name or 'Clip_' in file_name
-                    or 'CollectEvents_'in file_name or 'Integrate_' in file_name
-                    or 'Masking_' in file_name or 'LAR_' in file_name
-                    or 'ProbSurf_' in file_name or 'SimSampling_' in file_name:
-                            print "Deleting:", file_name
-                            arcpy.Delete_management(os.path.join(dirpath, file_name))
+                if any(nope_word in file_name for nope_word in nope_list):
+                    print "Deleting:", file_name
+                    arcpy.Delete_management(os.path.join(dirpath, file_name))
 
 
 ############################
@@ -1310,7 +1422,7 @@ if __name__ == '__main__':
                 
             print ''  # This just prints a blank line between each county.
 
-###############################################################################
+
     ############################
     ######### CLEANUP ##########
     ############################
