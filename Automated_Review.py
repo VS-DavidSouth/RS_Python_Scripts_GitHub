@@ -56,23 +56,12 @@ run_script_as_tool = False
 save_intermediates = True
 # Change track_completed_counties to false if you don't want the script
 # to keep track of the completed counties by editing the specified CSV.
-track_completed_counties = True
+track_completed_counties = False
 
-regional_35_counties = [
-    # Note that these are only saved here for ease of use. The clusters that are
-    # going to be run are found in the cluster_list, so if you want to run the
-    # clusters for all 35 counties from the Regional remote sensing project,
-    # then set cluster_list = regional_35_counties.
-    r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst\Alabama\BatchGDB_AL_Z16_c1.gdb',
-    r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst\Arkansas\BatchGDB_AR_Z15_c1.gdb',
-    r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst\Georgia\BatchGDB_GA_Z16_c1.gdb',
-    r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst\Georgia\BatchGDB_GA_Z17_c5.gdb',
-    r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst\Louisiana\BatchGDB_LA_Z15_c1.gdb',
-    r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst\Mississippi\BatchGDB_MS_Z16_c2.gdb',
-    r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst\North_Carolina\BatchGDB_NC_Z17_c1.gdb',
-    r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst\North_Carolina\BatchGDB_NC_Z18_c5.gdb',
-    r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst\Tennessee\BatchGDB_TN_Z16_c1.gdb',
-    ]
+# Specify the location of the CSV file where the script will track which
+# counties have been completed.  If no file is present at this location,
+#  the script will create a new blank file and begin to fill it.
+progress_tracking_file = r'R:\Nat_Hybrid_Poultry\Documents\trackingFileCSV.csv'
 
 # clustersList is a very important parameter. The script will reference this to
 # determine which folders to look for Batch files in, which will be used for
@@ -93,11 +82,6 @@ county_outline_folder = r'N:\Remote Sensing Projects\2016 Cooperative Agreement 
 # check that the read_adjFLAPS function to ensure it is reading the proper 
 # column.
 adjFLAPS_CSV = r'R:\Nat_Hybrid_Poultry\FLAPS\adjFLAPS_FINAL.csv'
-
-# Specify the location of the CSV file where the script will track which
-# counties have been completed.  If no file is present at this location,
-#  the script will create a new blank file and begin to fill it.
-progress_tracking_file = r'R:\Nat_Hybrid_Poultry\Documents\trackingFileCSV.csv'
 
 # MASKING: It is important to define if the masks that will be used. If you
 # don't want any masks, set either (or both) of these parameters = []. 
