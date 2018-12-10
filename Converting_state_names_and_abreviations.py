@@ -2,7 +2,7 @@
 ## It contains two dictionaries, one for converting states names to
 ## their abbreviations, and the other is the reverse.
 ##
-## To use these dictionaries, include the following code in the script:
+## To use these dictionaries, include the following code in other scripts:
 ##      sys.path.insert(0, r'O:\AI Modeling Coop Agreement 2017\David_working\Python')
 ##      from Converting_state_names_and_abreviations import *
 
@@ -19,6 +19,17 @@ def nameFormat (name):
     ##
     
     output = name.replace(" ", "_").replace("'","").replace(".","").replace("-","_")
+
+    return output
+
+
+def entryFormat(name):
+    ##
+    ## This function turns underscores ('_') to spaces. Note that this will not truly convert counties
+    ## back to their original state, because some counties had names like St. Claire, which was
+    ## formatted to St_Claire, and this function would reformat it to St Claire, which is not the same.
+    ##
+    output = name.replace("_", " ")
 
     return output
 

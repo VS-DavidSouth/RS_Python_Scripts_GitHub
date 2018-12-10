@@ -133,7 +133,7 @@ ss_bins_matrix = 'default'
 # Define num_iterations. Any number >1 will result multiple several iterations
 # of the simulated_sampling and project functions, with a unique file for each.
 # If a decimal is put in here, it will be rounded down.  This can be set to None.
-num_iterations = 10
+num_iterations = 1
 
 # Use skip_list to specify that certain counties, or steps for specific counties
 # can be skipped to make processing faster. This is typically done when changes
@@ -302,8 +302,8 @@ def check_parameters():
         (L_min_threshold, 'L_min_threshold'),
         (AR_max_threshold, 'AR_max_threshold'),
         (AR_min_threshold, 'AR_min_threshold'),
-        (num_iterations, 'num_iterations')
-        (clust_tolerance, 'clust_tolerance')
+        (num_iterations, 'num_iterations'),
+        (clust_tolerance, 'clust_tolerance'),
         ]
     for thing in should_be_files:
         parameter = thing[0]
@@ -370,6 +370,8 @@ def should_step_be_skipped(state_abbrev, county_name, step_name):
 
 def find_batch(cluster_GDB):
     """
+    This function finds all the point files in the target GDB
+    and returns them in the form of a list.
     :param cluster_GDB: A file path to a GDB or folder with point feature classes or shapefiles within.
     :return: A list of file paths of all point files within cluster_GDB.
     """
@@ -383,10 +385,7 @@ def find_batch(cluster_GDB):
             if filename[:6] == 'Batch_':
                 county_name = filename[9:]
                 path = os.path.join(dirpath, filename)
-                walk_list.append([county_name, path])
-
-    # Get the state abbreviation from the first path in walk_list.
-    state_abbrev = os.path.basename(walk_list[0][1]) [6:8]
+                walk_list.append([county_name, path,os.path.basename(path)[6:8]])
     
     return state_abbrev, walk_list
 
@@ -1241,9 +1240,8 @@ if __name__ == '__main__':
     errors = []
 
     for cluster_GDB in cluster_list:
-        
-        state_abbrev, batch_list = find_batch(cluster_GDB)
-        state_name = nameFormat(state_abbrev_to_name[state_abbrev])
+
+        batch_list = find_batch(cluster_GDB)
 
         for county_batch in batch_list:
 
@@ -1257,6 +1255,9 @@ if __name__ == '__main__':
             # intermediate files, which may or may not be deleted depending on
             # whether save_intermediates is True or False.
             intermed_list = []
+
+            state_abbrev = county_batch[2]
+            state_name = nameFormat(state_abbrev_to_name[state_abbrev])
 
             county_name = county_batch[0]
             batch_location = county_batch[1]
@@ -1329,7 +1330,7 @@ if __name__ == '__main__':
             print "Applying probability surface threshold for", state_name, \
                 county_name + "..."
             try:
-                prob_surfaceFile = prob_surface(LAR_file, prob_surface_raster,
+                prob_surface_file = prob_surface(LAR_file, prob_surface_raster,
                                                 cluster_GDB, state_abbrev,
                                                 county_name)
                 print "Probability surface threshold applied. " \
@@ -1345,7 +1346,7 @@ if __name__ == '__main__':
             #               #
             print "Collapsing points for", state_name, county_name + "..."
             try:
-                collapse_points_file = collapse_points(prob_surfaceFile,
+                collapse_points_file = collapse_points(prob_surface_file,
                                                        cluster_GDB, state_abbrev,
                                                        county_name)
                 print "Points collapsed. Script duration so far:", check_time()
