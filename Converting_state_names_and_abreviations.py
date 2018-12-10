@@ -22,6 +22,12 @@ def nameFormat (name):
 
     return output
 
+def entryFormat (name):
+    
+    output = name.replace("_"," ")
+
+    return output
+
 state_name_to_abbrev = {    ##
     'Alabama': 'AL',        ## This dictionary is used to document state names and also to switch the 
     'Alaska': 'AK',         ## full state name (Alabama)for the abbreviation (AL). This  section of the
