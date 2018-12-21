@@ -20,8 +20,9 @@
 # section.  Reference this URL:
 # http://desktop.arcgis.com/en/arcmap/10.3/analyze/creating-tools/adding-a-script-tool.htm
 #
-# The Spatial Analyst ArcGIS extension is required for the ProbSurface portion
-# of this script.
+# ArcGIS Desktop 10.5 must be installed on the computer that runs this script.
+# Previous versions of ArcGIS are untested.  The Spatial Analyst ArcGIS extension
+# is required for the ProbSurface portion of this script.
 #
 
 
@@ -270,7 +271,7 @@ def check_parameters():
    to change them in this function too!
 
    To disable this function, simply remove or comment out the following line
-   in the if __name__=='__main__': section of the ccode:
+   in the if __name__=='__main__': section of the code:
            check_parameters()
     :return: None
    """
@@ -1166,7 +1167,8 @@ def mark_county_as_completed(progress_tracking_file, state_abbrev,
     This function edits a CSV and can be used to keep track of which counties have been
     completed so far. It will create a new CSV if there isn't one at the
     progress_tracking_file location. This function is entirely optional.
-    :param progress_tracking_file: File path to the csv file where the infomration will be stored.
+    This function does not erase existing data, it merely adds more rows to the CSV.
+    :param progress_tracking_file: File path to the csv file where the information will be stored.
     :param state_abbrev: Same as the last 400 state_abbrev arguments in other functions.
     :param county_name: This should be pretty self-explanatory at this point.
     :param iteration: Iteration number. Not super important.
