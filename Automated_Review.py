@@ -69,7 +69,9 @@ progress_tracking_file = r'R:\Nat_Hybrid_Poultry\Documents\trackingFileCSV.csv'
 # the rest of the process. This parameter will be overwritten if
 # run_script_as_tool = True.
 cluster_list = [
-    r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst\Alabama\BatchTestGDB_AL_Z16_c1.gdb'
+    r'R:\Nat_Hybrid_Poultry\Results\Automated_Review_Results\New_York.gdb',
+    r'R:\Nat_Hybrid_Poultry\Results\Automated_Review_Results\Minnesota.gdb',
+    # counties that are having errors: Massachusetts through Mississipii
     ]
     
 # Specify the location of probability surface raster and the threshold.
@@ -388,7 +390,7 @@ def find_batch(cluster_GDB):
                 path = os.path.join(dirpath, filename)
                 walk_list.append([county_name, path,os.path.basename(path)[6:8]])
     
-    return state_abbrev, walk_list
+    return  walk_list
 
 
 def find_FIPS_UTM(county_file):
