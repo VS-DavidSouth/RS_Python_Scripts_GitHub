@@ -1296,18 +1296,16 @@ if __name__ == '__main__':
             # CLIPPING #
             #          #
             print "Clipping", state_name, county_name + "..."
-            #try:
-             #   clip_file = clip(batch_location, county_outline, cluster_GDB,
-              #                   state_abbrev, county_name)
-               # print "Clipped. Script duration so far:", check_time()
-            #except Exception:
-             #   e = sys.exc_info()[1]
-              #  print(e.args[0])
-               # errors.append(['Clip', state_abbrev,
-                #               county_name, e.args[0]])
+            try:
+                clip_file = clip(batch_location, county_outline, cluster_GDB,
+                                 state_abbrev, county_name)
+                print "Clipped. Script duration so far:", check_time()
+            except Exception:
+                e = sys.exc_info()[1]
+                print(e.args[0])
+                errors.append(['Clip', state_abbrev,
+                               county_name, e.args[0]])
 
-            clip_file = clip(batch_location, county_outline, cluster_GDB,
-                                 state_abbrev, county_name)  ##REMOVE THIS LATER
             print "Clipped. Script duration so far:", check_time()
 
             #          #
