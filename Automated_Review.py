@@ -20,9 +20,8 @@
 # section.  Reference this URL:
 # http://desktop.arcgis.com/en/arcmap/10.3/analyze/creating-tools/adding-a-script-tool.htm
 #
-# ArcGIS Desktop 10.5 must be installed on the computer that runs this script.
-# Previous versions of ArcGIS are untested.  The Spatial Analyst ArcGIS extension
-# is required for the ProbSurface portion of this script.
+# The Spatial Analyst ArcGIS extension is required for the ProbSurface portion
+# of this script.
 #
 
 
@@ -69,8 +68,7 @@ progress_tracking_file = r'R:\Nat_Hybrid_Poultry\Documents\trackingFileCSV.csv'
 # the rest of the process. This parameter will be overwritten if
 # run_script_as_tool = True.
 cluster_list = [
-    r'R:\Nat_Hybrid_Poultry\Results\Automated_Review_Results\New_York.gdb',
-    r'R:\Nat_Hybrid_Poultry\Results\Automated_Review_Results\Minnesota.gdb',
+    r'R:\Nat_Hybrid_Poultry\Results\Automated_Review_Results\Mississippi.gdb'
     # counties that are having errors: Massachusetts through Mississipii
     ]
     
@@ -141,18 +139,22 @@ num_iterations = 1
 # Use skip_list to specify that certain counties, or steps for specific counties
 # can be skipped to make processing faster. This is typically done when changes
 # are made to later steps, but the previous steps don't need to be completed
-# again.
+# again. Note that this list is ignored if the output file doesn't exist.
+# For example, you could use skip_list=[['MS', 'all_counties', 'all_steps'],]
+# to skip over all MS counties that have been completed  but do the counties that
+# don't have CollectEvents files or Project files, even though it isn't specified
+# in skip_list itself.
 skip_list = [
             # 1st column, put the state abbreviation in CAPS as a string.
             # 2nd column, put county name as a string, or 'all_counties'.
             # 3rd column, put either 'Clip', 'Mask', 'LAR', 'ProbSurf',
-            # 'CollectEvents', 'SimSampling' or 'all_steps'.  The latter
-            # indicates that no geoprocesses should be done for that file,
-            # since it has already been completed.
+            # 'CollectEvents', 'SimSampling', 'Project', or 'all_steps'.
+            # The latter indicates that no geoprocesses should be done
+            # for that file since it has already been completed.
 
             # Note: be sure to include commas after each line. Template:
             #       ['AL', 'all_counties', 'all_steps'],
-
+            ['MS', 'all_counties', 'all_steps'],
             ]
 
 # Overwrite certain parameters set above, if this tool is run as a custom
@@ -273,7 +275,7 @@ def check_parameters():
    to change them in this function too!
 
    To disable this function, simply remove or comment out the following line
-   in the if __name__=='__main__': section of the code:
+   in the if __name__=='__main__': section of the ccode:
            check_parameters()
     :return: None
    """
@@ -361,11 +363,8 @@ def should_step_be_skipped(state_abbrev, county_name, step_name):
     """
     for skip_item in skip_list:
         if skip_item[0] == state_abbrev:
-            if skip_item[1] == 'all_counties':
-                return True
-            elif nameFormat(skip_item[1]) == nameFormat(county_name):
-                if skip_item[2].lower() == 'all_steps' \
-                or skip_item[2].lower() == step_name.lower():
+            if skip_item[1] == 'all_counties' or nameFormat(skip_item[1]) == nameFormat(county_name):
+                if skip_item[2].lower() == 'all_steps' or skip_item[2].lower() == step_name.lower():
                     return True
     # If it isn't in the skip_list, just return false
     return False
@@ -1169,8 +1168,7 @@ def mark_county_as_completed(progress_tracking_file, state_abbrev,
     This function edits a CSV and can be used to keep track of which counties have been
     completed so far. It will create a new CSV if there isn't one at the
     progress_tracking_file location. This function is entirely optional.
-    This function does not erase existing data, it merely adds more rows to the CSV.
-    :param progress_tracking_file: File path to the csv file where the information will be stored.
+    :param progress_tracking_file: File path to the csv file where the infomration will be stored.
     :param state_abbrev: Same as the last 400 state_abbrev arguments in other functions.
     :param county_name: This should be pretty self-explanatory at this point.
     :param iteration: Iteration number. Not super important.
