@@ -68,7 +68,7 @@ progress_tracking_file = r'R:\Nat_Hybrid_Poultry\Documents\trackingFileCSV.csv'
 # the rest of the process. This parameter will be overwritten if
 # run_script_as_tool = True.
 cluster_list = [
-    r'R:\Nat_Hybrid_Poultry\Results\Automated_Review_Results\Mississippi.gdb'
+    r'R:\Nat_Hybrid_Poultry\Results\Automated_Review_Results\Michigan.gdb'
     # counties that are having errors: Massachusetts through Mississipii
     ]
     
@@ -154,7 +154,7 @@ skip_list = [
 
             # Note: be sure to include commas after each line. Template:
             #       ['AL', 'all_counties', 'all_steps'],
-            ['MS', 'all_counties', 'all_steps'],
+            ['MI', 'all_counties', 'all_steps'],
             ]
 
 # Overwrite certain parameters set above, if this tool is run as a custom
@@ -361,11 +361,14 @@ def should_step_be_skipped(state_abbrev, county_name, step_name):
     :param step_name: The string key to the step to be skipped. See skip_list for documentation.
     :return: Boolean.
     """
-    for skip_item in skip_list:
-        if skip_item[0] == state_abbrev:
-            if skip_item[1] == 'all_counties' or nameFormat(skip_item[1]) == nameFormat(county_name):
-                if skip_item[2].lower() == 'all_steps' or skip_item[2].lower() == step_name.lower():
-                    return True
+    if skip_list == [] or skip_list == [[]]:
+        return False
+    else:
+        for skip_item in skip_list:
+            if skip_item[0] == state_abbrev:
+                if skip_item[1] == 'all_counties' or nameFormat(skip_item[1]) == nameFormat(county_name):
+                    if skip_item[2].lower() == 'all_steps' or skip_item[2].lower() == step_name.lower():
+                        return True
     # If it isn't in the skip_list, just return false
     return False
 
@@ -1282,15 +1285,19 @@ if __name__ == '__main__':
             # CLIPPING #
             #          #
             print "Clipping", state_name, county_name + "..."
-            try:
-                clip_file = clip(batch_location, county_outline, cluster_GDB,
-                                 state_abbrev, county_name)
-                print "Clipped. Script duration so far:", check_time()
-            except Exception:
-                e = sys.exc_info()[1]
-                print(e.args[0])
-                errors.append(['Clip', state_abbrev,
-                               county_name, e.args[0]])
+            #try:
+             #   clip_file = clip(batch_location, county_outline, cluster_GDB,
+              #                   state_abbrev, county_name)
+               # print "Clipped. Script duration so far:", check_time()
+            #except Exception:
+             #   e = sys.exc_info()[1]
+              #  print(e.args[0])
+               # errors.append(['Clip', state_abbrev,
+                #               county_name, e.args[0]])
+
+            clip_file = clip(batch_location, county_outline, cluster_GDB,
+                                 state_abbrev, county_name)  ##REMOVE THIS LATER
+            print "Clipped. Script duration so far:", check_time()
 
             #          #
             #  MASKING #
