@@ -68,7 +68,7 @@ progress_tracking_file = r'R:\Nat_Hybrid_Poultry\Documents\trackingFileCSV.csv'
 # the rest of the process. This parameter will be overwritten if
 # run_script_as_tool = True.
 cluster_list = [
-    r'R:\Nat_Hybrid_Poultry\Results\Automated_Review_Results\Michigan.gdb'
+    r'R:\Nat_Hybrid_Poultry\Results\Automated_Review_Results\Massachusetts.gdb'
     # counties that are having errors: Massachusetts through Mississipii
     ]
     
@@ -154,7 +154,7 @@ skip_list = [
 
             # Note: be sure to include commas after each line. Template:
             #       ['AL', 'all_counties', 'all_steps'],
-            ['MI', 'all_counties', 'all_steps'],
+            ['MA', 'all_counties', 'all_steps'],
             ]
 
 # Overwrite certain parameters set above, if this tool is run as a custom
@@ -257,7 +257,7 @@ def check_time():
     has run so far.
     """
     time_so_far = time.time() - start_time
-    time_so_far /= 60     # changes this from seconds to minutes
+    time_so_far /= 60.     # changes this from seconds to minutes
     
     if time_so_far < 60. :
         return str(int(round(time_so_far))) + " minutes"
@@ -269,16 +269,16 @@ def check_time():
 def check_parameters():
     """
     This function is somewhat unpythonic, but it serves as a quick and simple
-   way of ensuring minor errors like forgetting the [] around an entry in
-   cluster_list won't cause strange errors that are confusing for users who
-   have little to no experience in Python.  If parameter names change, be sure
-   to change them in this function too!
+    way of ensuring minor errors like forgetting the [] around an entry in
+    cluster_list won't cause strange errors that are confusing for users who
+    have little to no experience in Python.  If parameter names change, be sure
+    to change them in this function too!
 
-   To disable this function, simply remove or comment out the following line
-   in the if __name__=='__main__': section of the ccode:
+    To disable this function, simply remove or comment out the following line
+    in the if __name__=='__main__': section of the ccode:
            check_parameters()
     :return: None
-   """
+    """
     should_be_files = [
         (prob_surface_raster, 'prob_surface_raster'),
         ]
@@ -821,6 +821,10 @@ def collapse_points(input_point_data, output_location, state_abbrev,
     are spaces or special characters in the file paths. Don't put blank
     spaces in your file paths. Don't do it. Like that creepy child you keep
     seeing in your basement, it will come back to haunt you.
+    If you get the error
+        "Error: ERROR 999999: Error executing function.
+        Invalid Topology [Maximum tolerance exceeded.]"
+    then be wary. Sometimes you can close programs, restart and try again and it works.
     :param input_point_data: Point feature class that was derived from the Batch file.
     :param output_location: The file path where the shiny new feature class will be saved.
     :param state_abbrev: Two-digit uppercase letter code of the relevant state as a string.
@@ -985,6 +989,7 @@ def simulated_sampling(input_point_data, raster_dataset, output_location, state_
     adjFLAPS = read_adjFLAPS(adjFLAPS_CSV)
     print "----Total number of points to select:", adjFLAPS
 
+        
     #                #
     ### SETUP BINS ###
     #                #
@@ -1049,57 +1054,63 @@ def simulated_sampling(input_point_data, raster_dataset, output_location, state_
                     cursor.updateRow(row)
                     break
                 
-    #                           #                      
-    ### DRAW POINTS FROM BINS ###
-    #                           #
-    # selected_points will be used to collect all the points that will be in
-    # the output.
-    selected_points = []
-                
-    for specific_bin in ss_bins:
-        # Create a list that contains the pool of points for that bin that we
-        # will draw random points out of.
-        pointsPool = []
-
-        with arcpy.da.SearchCursor(output_file_path, ['OBJECTID', 'ProbSurf_1', 'Bin', ]) as cursor2:
-            for row2 in cursor2:
-                # Check to see if the point matches the current bin label,
-                # if so, add it to pointsPool so it can be drawn out later.
-                if row2[2] == specific_bin[0]:
-                    pointsPool.append(row2)
+    # If adjFLAPS is 10-, don't do any deleting.       
+    if adjFLAPS >= 10:
+        print "Too few points to do Simulated Sampling. All points taken."
+        
+    # If adjFLAPS is greater than 10, draw out points and the rest will be deleted without mercy!
+    else:  
+        #                           #                      
+        ### DRAW POINTS FROM BINS ###
+        #                           #
+        # selected_points will be used to collect all the points that will be in
+        # the output.
+        selected_points = []
                     
-        # Randomly select (from the pointsPool list) a number of points equal
-        # to the value in the 5th column (index 4) of ss_bins.
-        try:
-            if random_seed is not None:
-                random.seed(random_seed)
-            # Draw out a bunch of points. Note that random.sample is sampling
-            # without replacement, meaning that once a point is drawn, it
-            # cannot be drawn out again. You will never get duplicates of the
-            # same point.
-            selected_points.append(random.sample(pointsPool, int(specific_bin[4])) )
+        for specific_bin in ss_bins:
+            # Create a list that contains the pool of points for that bin that we
+            # will draw random points out of.
+            pointsPool = []
 
-        # If there are too few points in that pool, select them all instead of
-        # taking some random points.
-        except ValueError:
-            print "Welp, guess we gotta take all the points for category", \
-                int(specific_bin[0])
-            selected_points.append(pointsPool)
+            with arcpy.da.SearchCursor(output_file_path, ['OBJECTID', 'ProbSurf_1', 'Bin', ]) as cursor2:
+                for row2 in cursor2:
+                    # Check to see if the point matches the current bin label,
+                    # if so, add it to pointsPool so it can be drawn out later.
+                    if row2[2] == specific_bin[0]:
+                        pointsPool.append(row2)
+                        
+            # Randomly select (from the pointsPool list) a number of points equal
+            # to the value in the 5th column (index 4) of ss_bins.
+            try:
+                if random_seed is not None:
+                    random.seed(random_seed)
+                # Draw out a bunch of points. Note that random.sample is sampling
+                # without replacement, meaning that once a point is drawn, it
+                # cannot be drawn out again. You will never get duplicates of the
+                # same point.
+                selected_points.append(random.sample(pointsPool, int(specific_bin[4])) )
 
-    # Create a list of just the OBJECTID values, which will be used to delete points.
-    selected_OIDs = []
-    for bn in selected_points:
-        for pointInfo in bn:
-            OID = pointInfo[0]
-            selected_OIDs.append(OID)
+            # If there are too few points in that pool, select them all instead of
+            # taking some random points.
+            except ValueError:
+                print "Welp, guess we gotta take all the points for category", \
+                    int(specific_bin[0])
+                selected_points.append(pointsPool)
 
-    with arcpy.da.UpdateCursor(output_file_path,
-                               ['OBJECTID', 'ProbSurf_1', 'Bin', ] ) as cursor3:
-        for row3 in cursor3:
-            # Check to see if the OBJECTID is in the OBJECTID section of the
-            # selected_points list, otherwise it gets deleted.
-            if row3[0] not in selected_OIDs:
-                    cursor3.deleteRow()
+        # Create a list of just the OBJECTID values, which will be used to delete points.
+        selected_OIDs = []
+        for bn in selected_points:
+            for pointInfo in bn:
+                OID = pointInfo[0]
+                selected_OIDs.append(OID)
+
+        with arcpy.da.UpdateCursor(output_file_path,
+                                   ['OBJECTID', 'ProbSurf_1', 'Bin', ] ) as cursor3:
+            for row3 in cursor3:
+                # Check to see if the OBJECTID is in the OBJECTID section of the
+                # selected_points list, otherwise it gets deleted.
+                if row3[0] not in selected_OIDs:
+                        cursor3.deleteRow()
                 
     #             #
     ### CLEANUP ###
