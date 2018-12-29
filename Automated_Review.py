@@ -68,7 +68,7 @@ progress_tracking_file = r'R:\Nat_Hybrid_Poultry\Documents\trackingFileCSV.csv'
 # the rest of the process. This parameter will be overwritten if
 # run_script_as_tool = True.
 cluster_list = [
-    r'R:\Nat_Hybrid_Poultry\Results\Automated_Review_Results\Massachusetts.gdb'
+    r'R:\Nat_Hybrid_Poultry\Results\Automated_Review_Results\Mississippi.gdb'
     # counties that are having errors: Massachusetts through Mississipii
     ]
     
@@ -145,7 +145,8 @@ num_iterations = 1
 # don't have CollectEvents files or Project files, even though it isn't specified
 # in skip_list itself.
 skip_list = [
-            # 1st column, put the state abbreviation in CAPS as a string.
+            # 1st column, put the state abbreviation in CAPS as a string,
+            # or 'all_states'.
             # 2nd column, put county name as a string, or 'all_counties'.
             # 3rd column, put either 'Clip', 'Mask', 'LAR', 'ProbSurf',
             # 'CollectEvents', 'SimSampling', 'Project', or 'all_steps'.
@@ -154,7 +155,7 @@ skip_list = [
 
             # Note: be sure to include commas after each line. Template:
             #       ['AL', 'all_counties', 'all_steps'],
-            ['MA', 'all_counties', 'all_steps'],
+            ['MS', 'all_counties', 'all_steps'],
             ]
 
 # Overwrite certain parameters set above, if this tool is run as a custom
@@ -365,7 +366,7 @@ def should_step_be_skipped(state_abbrev, county_name, step_name):
         return False
     else:
         for skip_item in skip_list:
-            if skip_item[0] == state_abbrev:
+            if skip_item[0].lower() == 'all_states' or skip_item[0] == state_abbrev:
                 if skip_item[1] == 'all_counties' or nameFormat(skip_item[1]) == nameFormat(county_name):
                     if skip_item[2].lower() == 'all_steps' or skip_item[2].lower() == step_name.lower():
                         return True
@@ -1305,9 +1306,7 @@ if __name__ == '__main__':
                 print(e.args[0])
                 errors.append(['Clip', state_abbrev,
                                county_name, e.args[0]])
-
-            print "Clipped. Script duration so far:", check_time()
-
+ 
             #          #
             #  MASKING #
             #          #
