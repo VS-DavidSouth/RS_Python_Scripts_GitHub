@@ -155,7 +155,11 @@ skip_list = [
 
             # Note: be sure to include commas after each line. Template:
             #       ['AL', 'all_counties', 'all_steps'],
-            ['MS', 'all_counties', 'all_steps'],
+            ['MS', 'all_counties', 'Clip'],
+            ['MS', 'all_counties', 'Mask'],
+            ['MS', 'all_counties', 'LAR'],
+            ['MS', 'all_counties', 'ProbSurf'],
+            ['MS', 'all_counties', 'CollectEvents'],
             ]
 
 # Overwrite certain parameters set above, if this tool is run as a custom
@@ -1055,11 +1059,12 @@ def simulated_sampling(input_point_data, raster_dataset, output_location, state_
                     cursor.updateRow(row)
                     break
                 
-    # If adjFLAPS is 10-, don't do any deleting.       
-    if adjFLAPS >= 10:
+    # If adjFLAPS is too low, don't do any deleting.       
+    if adjFLAPS <= arcpy.GetCount_management(input_point_data):
         print "Too few points to do Simulated Sampling. All points taken."
         
-    # If adjFLAPS is greater than 10, draw out points and the rest will be deleted without mercy!
+    # If adjFLAPS is greater than the number of points in the input data,
+    # draw out points and the rest will be deleted without mercy!
     else:  
         #                           #                      
         ### DRAW POINTS FROM BINS ###
