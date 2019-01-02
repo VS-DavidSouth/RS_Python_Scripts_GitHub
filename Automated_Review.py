@@ -28,8 +28,6 @@
 ############################
 ########## SETUP ###########
 ############################
-# This next import gives us access to two dictionaries for
-# converting state names to abbreviations and vice versa.
 import os
 import sys
 import csv
@@ -401,7 +399,7 @@ def find_batch(cluster_GDB):
                 path = os.path.join(dirpath, filename)
                 walk_list.append([county_name, path,os.path.basename(path)[6:8]])
     
-    return  walk_list
+    return walk_list
 
 
 def find_FIPS_UTM(county_file):
@@ -528,11 +526,11 @@ def LAR(input_feature, output_location, LAR_thresholds,
     This function applies strict LAR thresholds, removing points from the
     input point feature class. LAR stands for Length(L) and Aspect Ratio(AR).
     This function deletes points that do not conform with L or AR thresholds.
+
     :param input_feature: Point feature class that was derived from the Batch file.
     :param output_location: File path where the LAR file will be saved.
     :param LAR_thresholds: A list of 4 parameters, likely given in the LAR_thresolds
     global variable.
-
     :param state_abbrev: Two-digit uppercase letter code of the relevant state as a string.
     :param county_name: The name of the relevant county as a string.
     :return: The file path to the newly created LAR file.
@@ -833,7 +831,7 @@ def collapse_points(input_point_data, output_location, state_abbrev,
     spaces in your file paths. Don't do it. Like that creepy child you keep
     seeing in your basement, it will come back to haunt you.
     If you get the error
-        "Error: ERROR 999999: Error executing function.
+        "ERROR 999999: Error executing function.
         Invalid Topology [Maximum tolerance exceeded.]"
     then be wary. Sometimes you can close programs, restart and try again and it works.
 
@@ -1097,7 +1095,7 @@ def simulated_sampling(input_point_data, raster_dataset, output_location, state_
             # to the value in the 5th column (index 4) of ss_bins.
             try:
                 if random_seed is not None:
-                    random.seed(random_seed)
+                    random.seed(random_seed)  # Note that random seed is untested in this script..
                 # Draw out a bunch of points. Note that random.sample is sampling
                 # without replacement, meaning that once a point is drawn, it
                 # cannot be drawn out again. You will never get duplicates of the
