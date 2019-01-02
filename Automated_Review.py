@@ -68,7 +68,7 @@ progress_tracking_file = r'R:\Nat_Hybrid_Poultry\Documents\trackingFileCSV.csv'
 # the rest of the process. This parameter will be overwritten if
 # run_script_as_tool = True.
 cluster_list = [
-    r'R:\Nat_Hybrid_Poultry\Results\Automated_Review_Results\Mississippi.gdb'
+    r'R:\Nat_Hybrid_Poultry\Results\Automated_Review_Results\Massachusetts.gdb'
     # counties that are having errors: Massachusetts through Mississipii
     ]
     
@@ -148,18 +148,19 @@ skip_list = [
             # 1st column, put the state abbreviation in CAPS as a string,
             # or 'all_states'.
             # 2nd column, put county name as a string, or 'all_counties'.
-            # 3rd column, put either 'Clip', 'Mask', 'LAR', 'ProbSurf',
+            # 3rd column, put either 'Clip', 'Masking', 'LAR', 'ProbSurf',
             # 'CollectEvents', 'SimSampling', 'Project', or 'all_steps'.
             # The latter indicates that no geoprocesses should be done
             # for that file since it has already been completed.
 
             # Note: be sure to include commas after each line. Template:
             #       ['AL', 'all_counties', 'all_steps'],
-            ['MS', 'all_counties', 'Clip'],
-            ['MS', 'all_counties', 'Mask'],
-            ['MS', 'all_counties', 'LAR'],
-            ['MS', 'all_counties', 'ProbSurf'],
-            ['MS', 'all_counties', 'CollectEvents'],
+            ['MA', 'all_counties', 'Clip'],
+            ['MA', 'all_counties', 'Masking'],
+            ['MA', 'all_counties', 'LAR'],
+            ['MA', 'all_counties', 'ProbSurf'],
+            ['MA', 'all_counties', 'CollectEvents'],
+            ['MA', 'all_counties', 'SimSampling'],
             ]
 
 # Overwrite certain parameters set above, if this tool is run as a custom
@@ -282,6 +283,7 @@ def check_parameters():
     To disable this function, simply remove or comment out the following line
     in the if __name__=='__main__': section of the ccode:
            check_parameters()
+
     :return: None
     """
     should_be_files = [
@@ -361,6 +363,7 @@ def should_step_be_skipped(state_abbrev, county_name, step_name):
     """
     This function returns either True or False, based on whether
     the specified county is in skip_list.
+
     :param state_abbrev: Two-digit uppercase letter code of the relevant state as a string.
     :param county_name: The name of the relevant county as a string.
     :param step_name: The string key to the step to be skipped. See skip_list for documentation.
@@ -382,6 +385,7 @@ def find_batch(cluster_GDB):
     """
     This function finds all the point files in the target GDB
     and returns them in the form of a list.
+
     :param cluster_GDB: A file path to a GDB or folder with point feature classes or shapefiles within.
     :return: A list of file paths of all point files within cluster_GDB.
     """
@@ -403,6 +407,7 @@ def find_batch(cluster_GDB):
 def find_FIPS_UTM(county_file):
     """
     This determines the appropriate UTM and FIPS code values for the county.
+
     :param county_file: File path to a feature class (or similar) ArcGIS file that contains all
     relevant counties and their UTM and FIPS information.
     :return: FIPS code as a string, UTM code as a string
@@ -416,6 +421,7 @@ def add_FIPS_info(input_feature, state_abbrev, county_name):
     """
     This function adds the FIPS value (from the find_FIPS_UTM function) to a given
     shapefile.
+
     :param input_feature: The file path to a feature class or shapefile.
     :param state_abbrev: Two-digit uppercase letter code of the relevant state as a string.
     :param county_name: The name of the relevant county as a string.
@@ -478,6 +484,7 @@ def clip(input_feature, clip_files, output_location,
     """
     This function clips the Batch file to the county outline. It also adds FIPS
     information.
+
     :param input_feature: The Batch point feature class.
     :param clip_files: A file path or list of file paths of feature classes to use
     to clip the Batch file. This should probably be the county outlien feature class.
@@ -525,6 +532,7 @@ def LAR(input_feature, output_location, LAR_thresholds,
     :param output_location: File path where the LAR file will be saved.
     :param LAR_thresholds: A list of 4 parameters, likely given in the LAR_thresolds
     global variable.
+
     :param state_abbrev: Two-digit uppercase letter code of the relevant state as a string.
     :param county_name: The name of the relevant county as a string.
     :return: The file path to the newly created LAR file.
@@ -603,6 +611,7 @@ def masking(input_feature, output_location, state_abbrev, county_name,
     look similar to this, with # representing the buffer distance in Meters:
           [[r'C:\file_path\file', #],
            [r'C:\alt_file_path\file2', #]]
+
     :param input_feature: Point feature class that was derived from the Batch file.
     :param output_location: The file path where the masking output will be saved.
     :param state_abbrev: Two-digit uppercase letter code of the relevant state as a string.
@@ -635,6 +644,7 @@ def masking(input_feature, output_location, state_abbrev, county_name,
         This function is used for each mask. This mini-function is NOT for
         clipping or erasing the point file input data and only deals with
         mask files themselves.
+
         :param mask: A single element from either neg_masks or pos_masks, in the form of a list with a
         file path and a integer (or similar number) buffer distance.
         :param temp_location: File path to place the temprorary clipped mask file.
@@ -747,6 +757,7 @@ def add_raster_info(point_data_to_alter, raster_dataset,
     called ProbSurf_1 and ProbSurf_2 respectively. ProbSurf_1 has
     no interpolation, ProbSurf_2 has bilinear interpolation.
     Note: THIS FUNCTION CHANGES THE INPUT FEATURE CLASS BY ADDING FIELDS.
+
     :param point_data_to_alter: File path to a feature class file.
     :param raster_dataset:  File path for the raster file in an ArcGIS format.
     :param field_name_1: Name of the field in the raster that data will be taken from, as a string.
@@ -770,6 +781,7 @@ def prob_surface(input_point_data, raster_dataset, output_location,
     This function reduces false positives in the Batch file ("clutter") by
     removing points that exist at locations that are below the specified threshold
     on the probability surface raster from FLAPS.
+
     :param input_point_data: Point feature class that was derived from the Batch file.
     :param raster_dataset: File path to the probability surface raster from FLAPS.
     :param output_location: File path where output feature class will be saved.
@@ -777,12 +789,6 @@ def prob_surface(input_point_data, raster_dataset, output_location,
     :param county_name: The name of the relevant county as a string.
     :return: The file path to the newly created feature class.
     """
-    """This function exists to replace the Manual Review step of the regional
-    remote sensing procedure. It uses the FLAPS probability surface to
-    determine which points are True Positives (TP) or False Positives (FP).
-    This function is largely outdated by the simulated_sampling function.
-    """
-
     county_name = nameFormat(county_name)
 
     output_name = 'ProbSurf_' + state_abbrev + '_' + county_name
@@ -830,6 +836,7 @@ def collapse_points(input_point_data, output_location, state_abbrev,
         "Error: ERROR 999999: Error executing function.
         Invalid Topology [Maximum tolerance exceeded.]"
     then be wary. Sometimes you can close programs, restart and try again and it works.
+
     :param input_point_data: Point feature class that was derived from the Batch file.
     :param output_location: The file path where the shiny new feature class will be saved.
     :param state_abbrev: Two-digit uppercase letter code of the relevant state as a string.
@@ -888,6 +895,7 @@ def simulated_sampling(input_point_data, raster_dataset, output_location, state_
 
     Note that this function assumes that prob_surface_threshold = 0.1 as default.
     If this isn't the case, be sure to specify a custom ss_bins matrix.
+    
     :param input_point_data: Point feature class that was derived from the Batch file.
     :param raster_dataset: File path to a raster dataset in ArcGIS format.
     :param output_location: The file path that dictates where to save this marvelous output file.
@@ -1050,17 +1058,17 @@ def simulated_sampling(input_point_data, raster_dataset, output_location, state_
         for row in cursor:
             ProbSurf_1 = row[1]
             
-            for binThresholds in ss_bins:
+            for bin_thresholds in ss_bins:
                 # Classify the point based on which of the bin max and min
                 # categories that it fits within.
-                if ProbSurf_1 > binThresholds[1] and ProbSurf_1 <= binThresholds[2]:
+                if ProbSurf_1 > bin_thresholds[1] and ProbSurf_1 <= bin_thresholds[2]:
                     # Assign the Bin field based on what range the ProbSurf_1 field fits in.
-                    row[2] = int(binThresholds[0])
+                    row[2] = int(bin_thresholds[0])
                     cursor.updateRow(row)
                     break
                 
-    # If adjFLAPS is too low, don't do any deleting.       
-    if adjFLAPS <= arcpy.GetCount_management(input_point_data):
+    # If adjFLAPS is too low, don't do any deleting.
+    if adjFLAPS <= int(arcpy.GetCount_management(input_point_data)[0]):
         print "Too few points to do Simulated Sampling. All points taken."
         
     # If adjFLAPS is greater than the number of points in the input data,
@@ -1132,6 +1140,7 @@ def project(input_data, output_location, UTM_code, state_abbrev,
     """
     This function projects the input from the UTM county projection into
     WGS 1984 Geographic Coordinate System.
+
     :param input_data: Point feature class that was derived from the Batch file.
     :param output_location: The file path  where the final output of this script will be saved.
     :param UTM_code: The UTM code, in string form, from the input coordinate system.
@@ -1183,11 +1192,12 @@ def project(input_data, output_location, UTM_code, state_abbrev,
 
 
 def mark_county_as_completed(progress_tracking_file, state_abbrev,
-                          county_name, iteration=None):
+                             county_name, iteration=None):
     """
     This function edits a CSV and can be used to keep track of which counties have been
     completed so far. It will create a new CSV if there isn't one at the
     progress_tracking_file location. This function is entirely optional.
+
     :param progress_tracking_file: File path to the csv file where the infomration will be stored.
     :param state_abbrev: Same as the last 400 state_abbrev arguments in other functions.
     :param county_name: This should be pretty self-explanatory at this point.
@@ -1216,6 +1226,7 @@ def delete_intermediates(intermed_list):
     whenever they have any intermediate files. It will delete
     all files that are in list format in the intermed_list
     input. `intermed` is short for intermediate.
+
     :param intermed_list: A list of file paths which are doomed to be deleted and to android hell.
     :return: None.
     """
@@ -1232,9 +1243,9 @@ def clear_GDB(folder):
     in their name. Do not use this function unless you are positive
     of what it is going to delete. Once you delete something, its gone.
     Or you have to pay thousands of dollars for data recovery, and it
-    might not even work. Remember that.
+    might not even work. Remember that. This function will not delete
+    any `Batch` files.
 
-    This function will not delete any `Batch` files.
     :param folder: The folder that you want to clear the outdated clutter from.
     :return: None.
     """
