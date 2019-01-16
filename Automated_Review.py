@@ -20,7 +20,7 @@
 # section.  Reference this URL:
 # http://desktop.arcgis.com/en/arcmap/10.3/analyze/creating-tools/adding-a-script-tool.htm
 #
-# The Spatial Analyst ArcGIS extension is required for the ProbSurface portion
+# The Spatial Analyst ArcGIS extension is required for the prob_surface portion
 # of this script.
 #
 
@@ -205,16 +205,16 @@ LAR_thresholds = [
 # NAMING CONVENTIONS:
 # Names for all files created in this script will follow the the same format.
 #
-#      [prefix]_[ST]_Z[##]_c[#]_[CountyName].[ext]
+#      [prefix]_[ST]_Z[##]_c[#]_[County_Name].[ext]
 #
-# Some files will not have Z[##], c[#], or [CountyName].
+# Some files will not have Z[##], c[#], or [County_Name].
 #
 #      [prefix] -> a unique identifier for each type of file, below is a
 #                  dictionary explaining each prefix
 #      [ST] -> the 2-letter state abbreviation
 #      Z[##] -> the UTM zone number
 #      c[#] -> the cluster number
-#      [CountyName] -> the specific county name
+#      [County_Name] -> the specific county name
 #      [ext] -> the file extension
 #
 
