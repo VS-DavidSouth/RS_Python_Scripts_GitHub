@@ -50,9 +50,15 @@ arcpy.env.OverwriteOutput = True
 ###########################
 #       PARAMETERS
 ###########################
-auto_review_folder = ''
+auto_review_folder = r'R:\Nat_Hybrid_Poultry\Results\Automated_Review_Results'
 
-CSV_output_file_path = r''
+CSV_output_file_path = r'R:\Nat_Hybrid_Poultry\Results\594_counties.csv'
+
+# Determine whether the script should automatically search for the file locations or if you
+# just want to specify the locations using a CSV file. If `search_for_file_locations` is False
+# then it doesn't matter what is specified by `auto_review_file_locations`.
+search_for_file_locations = False
+auto_review_file_locations = r'R:\Nat_Hybrid_Poultry\Results\results_files_list.csv'
 
 ###########################
 #    DEFINE FUNCTIONS
@@ -71,13 +77,13 @@ def find_files(folder):
 
     for dirpath, dirnames, filenames in walk:
         for filename in filenames:
-            if filename[:11] == 'AutoReview_':
+            if filename[:11] == 'AutoReview_' and 'Validation.gdb' not in dirpath:
 
                 # Here, think about adding a section that selects for files with iterations
 
                 county_name = filename[14:]
                 path = os.path.join(dirpath, filename)
-                walk_list.append([os.path.basename(path)[11:14]], county_name, path, )
+                walk_list.append([os.path.basename(path)[11:13], county_name, path])
 
     return walk_list
 
@@ -104,36 +110,60 @@ def write_row_to_CSV(CSV_file, row, overwrite=False):
 
     return
 
+
+def read_CSV(CSV_file, skip_first_row=False):
+    temp_list = []
+    with open(CSV_file) as csv_file:
+        reader = csv.reader(csv_file, delimiter=',')
+        first_row = True
+        for row in reader:
+            if first_row and skip_first_row:
+                first_row = False
+                continue
+            else:
+                temp_list += [row]
+                
+    return temp_list
+
+
 ###########################
 #       RUN CODE
 ###########################
+if __name__ == '__main__':
+        
+    # Set unique_ID to 0. This will go up with each new point.
+    unique_ID = 0
 
-# Set unique_ID to 0. This will go up with each new point.
-unique_ID = 0
+    # Lets get this party started. Collect all the AutoReview file locations into a list.
+    # Each item contains a small list. To get state abbreviation - [0], county name - [1],
+    # and file path - [2].
+    if search_for_file_locations:
+        auto_review_files = find_files(auto_review_folder)
+    else:
+        auto_review_files = read_CSV(auto_review_file_locations)
+    check_time()
 
-# Lets get this party started. Collect all the AutoReview file locations into a list.
-# Each item contains a small list. To get state abbreviation - [0], county name - [1],
-# and file path - [2].
-auto_review_files = find_files(auto_review_folder)
+    # Overwrite the output CSV and write the first line.
+    write_row_to_CSV(CSV_output_file_path,
+                     ['Unique_ID', 'State', 'County', 'FIPS',
+                      'FIPS2',  'ICOUNT', 'ProbSurf_1', 'ProbSurf_2', 'Bin',
+                      'POINT_X', 'POINT_Y'],
+                     overwrite=True)
 
-# Overwrite the output CSV and write the first line.
-write_row_to_CSV(CSV_output_file_path,
-                 ['Unique_ID', 'State', 'County', 'FIPS',
-                  'FIPS2',  'ICOUNT', 'ProbSurf_1', 'ProbSurf_2', 'Bin',
-                  'POINT_X', 'POINT_Y'],
-                 overwrite=True)
+    # Loop for each individual file.
+    for auto_review_file in auto_review_files:
+        state_abbrev = auto_review_file[0]
+        state_name = state_abbrev_to_name[state_abbrev]
+        county_name = auto_review_file[1]
 
-# Loop for each individual file.
-for auto_review_file in auto_review_files:
-    state_abbrev = auto_review_file[0]
-    state_name = state_abbrev_to_name(state_abbrev)
-    county_name = auto_review_file[1]
+        # Loop for each individual row in each file
+        with arcpy.da.SearchCursor(auto_review_file[2],
+                                   ['FIPS', 'FIPS2',  'ICOUNT', 'ProbSurf_1', 'ProbSurf_2', 'Bin',
+                                   'POINT_X', 'POINT_Y']) as cursor:
+            for premise in cursor:
+                unique_ID += 1
+                new_row = [unique_ID, state_name, county_name] + list(premise)
+                write_row_to_CSV(CSV_output_file_path, new_row)
 
-    # Loop for each individual row in each file
-    with arcpy.da.SearchCursor(auto_review_file[2],
-                               ['FIPS', 'FIPS2',  'ICOUNT', 'ProbSurf_1', 'ProbSurf_2', 'Bin',
-                               'POINT_X', 'POINT_Y']) as cursor:
-        for premise in cursor:
-            new_row = [unique_ID, state_name, county_name] + premise
-            write_row_to_CSV(CSV_output_file_path, row)
 
+    print "Script complete! This has taken", check_time()
