@@ -1139,7 +1139,7 @@ def simulated_sampling(input_point_data, raster_dataset, output_location, state_
     
 
 def project(input_data, output_location, UTM_code, state_abbrev,
-            county_name, iteration=None):
+            county_name, custom_file_name=None, iteration=None):
     """
     This function projects the input from the UTM county projection into
     WGS 1984 Geographic Coordinate System.
@@ -1150,6 +1150,7 @@ def project(input_data, output_location, UTM_code, state_abbrev,
     :param state_abbrev: Two-digit uppercase letter code of the relevant state as a string.
     :param county_name: The name of the county as a string.
     :param iteration: None, or the iteration value, either as an integer or string.
+    :param custom_file_name: None, or a custom file name. This should not include file path.
     :return: The output file path for the final resting place of this script, projected and pretty.
     """
     # Get rid of any weird characters in the county name.
@@ -1157,6 +1158,8 @@ def project(input_data, output_location, UTM_code, state_abbrev,
 
     if iteration is None:
         output_name = 'AutoReview_' + state_abbrev + '_' + county_name
+    elif custom_file_name is not None:
+        output_name = custom_file_name
     else:
         output_name = 'AutoReview_' + state_abbrev + '_' + county_name + '_i' \
                      + str(iteration)
