@@ -405,6 +405,11 @@ def find_batch(cluster_GDB):
 def find_FIPS_UTM(county_file):
     """
     This determines the appropriate UTM and FIPS code values for the county.
+    WARNING: This script will return unicode, because some counties have FIPS
+    codes starting with zero. Convert to int to remove the starting zero! Remember,
+    in Python numbers starting with zero are converted, so:
+        >>> 01031 == 537
+        True
 
     :param county_file: File path to a feature class (or similar) ArcGIS file that contains all
     relevant counties and their UTM and FIPS information.

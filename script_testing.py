@@ -1,4 +1,4 @@
-from Auto_Review_to_CSV import *
+from Automated_Review import project, find_FIPS_UTM, county_outline_folder
 import numpy as np
 import arcpy
 import os
