@@ -856,26 +856,25 @@ def collapse_points(input_point_data, output_location, state_abbrev,
 
     # Check to see if it should skip. Otherwise delete existing files.
     if arcpy.Exists(collectEventsOutputFilePath) == True:
-        if should_step_be_skipped(state_abbrev, county_name,
-                               'CollectEvents') == True:
+        if should_step_be_skipped(state_abbrev, county_name, 'CollectEvents') == True:
             print "collapse_points skipped."
             return collectEventsOutputFilePath
         else:
             arcpy.Delete_management(collectEventsOutputFilePath)
 
-    tempIntegrateFile = os.path.join('in_memory', 'temp_integrate')
+    temp_integrate_file = os.path.join('in_memory', 'temp_integrate')
         
-    arcpy.CopyFeatures_management (input_point_data, tempIntegrateFile)
+    arcpy.CopyFeatures_management (input_point_data, temp_integrate_file)
 
     # The input file path to the Integrate tool NEEDS to have no spaces in it,
     # otherwise it will cause frustratingly vague errors.
-    arcpy.Integrate_management(in_features=tempIntegrateFile, cluster_tolerance="%s Meters" %str(clust_tolerance) )
+    arcpy.Integrate_management(in_features=temp_integrate_file, cluster_tolerance="%s Meters" %str(clust_tolerance) )
 
     # Collapse points that are on top of each other to single points.
-    arcpy.CollectEvents_stats(Input_Incident_Features=tempIntegrateFile,
+    arcpy.CollectEvents_stats(Input_Incident_Features=temp_integrate_file,
                               Output_Weighted_Point_Feature_Class=collectEventsOutputFilePath)
 
-    arcpy.Delete_management(tempIntegrateFile)
+    arcpy.Delete_management(temp_integrate_file)
 
     add_FIPS_info(collectEventsOutputFilePath, state_abbrev, county_name)
 

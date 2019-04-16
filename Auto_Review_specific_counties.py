@@ -1,10 +1,9 @@
-####################### Autom_Review_specific_counties.py #######################
+####################### Auto_Review_specific_counties.py #######################
 
 ############################
 ####### DESCRIPTION ########
 ############################
-# Note that this uses skip_list from the Automated_Review script, so
-# if you don't want something to be skipped, change it there and save it.
+
 ############################
 ##########  SETUP ##########
 ############################
@@ -14,15 +13,41 @@ from Automated_Review import *
 ############################
 ######## PARAMETERS ########
 ############################
-batch = os.path.join(cluster_list[0], 'Batch_MS_Winston')
 
 ############################
 ##### DEFINE FUNCTIONS #####
 ############################
+def single_step(func):
+    """
+    This function allows you to run steps from Automated_Review.py as normal,
+    without having to worry about tracking intermed_list, or skip_list.
+    Note: This will override existing features, beware!
+    Put the full function for func. For example:
+    clip(input_feature=filepath, clip_files=files, output_location=output,
+         state_abbrev="DC", county_name="District_of_Colombia")
+    Of course, you can't use DC as a state because DC is not a state and has
+    taxation without representation despite a population of 700,000+, greater than
+    the entire population of Vermont or Wyoming. But good thing the US split Dakatoa
+    into both a North Dakota and a South Dakota, which had populations of 190,983
+    and 348,600 respectively when they achieved statehood.
+    :param func: the function from Automated_Review, with all of its parameters.
+    :return: output file path
+    """
+    intermed_list = []
+    skip_list = []
+    path = func
+    return path
+
+
 def single_county(batch_file, iteration_number=None):
-    ##
-    ##
-    ##
+    """
+    This function runs all the steps for a single county.
+    Note that this uses skip_list from the Automated_Review script, so
+    if you don't want something to be skipped, change it there and save it.
+    :param batch_file: file path to the relevant batch_file
+    :param iteration_number: optional iteration number. Untested.
+    :return: file path to AutoReview file.
+    """
     global neg_masks
     
     cluster_GDB = os.path.dirname(batch_file)
