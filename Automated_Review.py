@@ -856,26 +856,25 @@ def collapse_points(input_point_data, output_location, state_abbrev,
 
     # Check to see if it should skip. Otherwise delete existing files.
     if arcpy.Exists(collectEventsOutputFilePath) == True:
-        if should_step_be_skipped(state_abbrev, county_name,
-                               'CollectEvents') == True:
+        if should_step_be_skipped(state_abbrev, county_name, 'CollectEvents') == True:
             print "collapse_points skipped."
             return collectEventsOutputFilePath
         else:
             arcpy.Delete_management(collectEventsOutputFilePath)
 
-    tempIntegrateFile = os.path.join('in_memory', 'temp_integrate')
+    temp_integrate_file = os.path.join('in_memory', 'temp_integrate')
         
-    arcpy.CopyFeatures_management (input_point_data, tempIntegrateFile)
+    arcpy.CopyFeatures_management (input_point_data, temp_integrate_file)
 
     # The input file path to the Integrate tool NEEDS to have no spaces in it,
     # otherwise it will cause frustratingly vague errors.
-    arcpy.Integrate_management(in_features=tempIntegrateFile, cluster_tolerance="%s Meters" %str(clust_tolerance) )
+    arcpy.Integrate_management(in_features=temp_integrate_file, cluster_tolerance="%s Meters" %str(clust_tolerance) )
 
     # Collapse points that are on top of each other to single points.
-    arcpy.CollectEvents_stats(Input_Incident_Features=tempIntegrateFile,
+    arcpy.CollectEvents_stats(Input_Incident_Features=temp_integrate_file,
                               Output_Weighted_Point_Feature_Class=collectEventsOutputFilePath)
 
-    arcpy.Delete_management(tempIntegrateFile)
+    arcpy.Delete_management(temp_integrate_file)
 
     add_FIPS_info(collectEventsOutputFilePath, state_abbrev, county_name)
 
@@ -1087,16 +1086,16 @@ def simulated_sampling(input_point_data, raster_dataset, output_location, state_
         for specific_bin in ss_bins:
             # Create a list that contains the pool of points for that bin that we
             # will draw random points out of.
-            pointsPool = []
+            points_pool = []
 
             with arcpy.da.SearchCursor(output_file_path, ['OBJECTID', 'ProbSurf_1', 'Bin', ]) as cursor2:
                 for row2 in cursor2:
                     # Check to see if the point matches the current bin label,
-                    # if so, add it to pointsPool so it can be drawn out later.
+                    # if so, add it to points_pool so it can be drawn out later.
                     if row2[2] == specific_bin[0]:
-                        pointsPool.append(row2)
+                        points_pool.append(row2)
                         
-            # Randomly select (from the pointsPool list) a number of points equal
+            # Randomly select (from the points_pool list) a number of points equal
             # to the value in the 5th column (index 4) of ss_bins.
             try:
                 if random_seed is not None:
@@ -1105,14 +1104,14 @@ def simulated_sampling(input_point_data, raster_dataset, output_location, state_
                 # without replacement, meaning that once a point is drawn, it
                 # cannot be drawn out again. You will never get duplicates of the
                 # same point.
-                selected_points.append(random.sample(pointsPool, int(specific_bin[4])) )
+                selected_points.append(random.sample(points_pool, int(specific_bin[4])) )
 
             # If there are too few points in that pool, select them all instead of
             # taking some random points.
             except ValueError:
                 print "Welp, guess we gotta take all the points for category", \
                     int(specific_bin[0])
-                selected_points.append(pointsPool)
+                selected_points.append(points_pool)
 
         # Create a list of just the OBJECTID values, which will be used to delete points.
         selected_OIDs = []
