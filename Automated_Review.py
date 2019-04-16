@@ -423,7 +423,7 @@ def find_FIPS_UTM(county_file):
 def add_FIPS_info(input_feature, state_abbrev, county_name):
     """
     This function adds the FIPS value (from the find_FIPS_UTM function) to a given
-    shapefile.
+    shapefile. There may be errors if input_feature isn't in a GDB.
 
     :param input_feature: The file path to a feature class or shapefile.
     :param state_abbrev: Two-digit uppercase letter code of the relevant state as a string.
@@ -490,7 +490,7 @@ def clip(input_feature, clip_files, output_location,
 
     :param input_feature: The Batch point feature class.
     :param clip_files: A file path or list of file paths of feature classes to use
-    to clip the Batch file. This should probably be the county outlien feature class.
+    to clip the Batch file. This should probably be the county outline feature class.
     :param output_location: File path where the clipped file will be saved.
     :param state_abbrev: Two-digit uppercase letter code of the relevant state as a string.
     :param county_name: The name of the relevant county as a string.
