@@ -1154,14 +1154,13 @@ def project(input_data, output_location, UTM_code, state_abbrev,
     """
     # Get rid of any weird characters in the county name.
     county_name = nameFormat(county_name)
-
-    if iteration is None:
+    if custom_file_name is None and iteration is None:
         output_name = 'AutoReview_' + state_abbrev + '_' + county_name
-    elif custom_file_name is not None:
-        output_name = custom_file_name
-    else:
+    elif custom_file_name is None and iteration is not None:
         output_name = 'AutoReview_' + state_abbrev + '_' + county_name + '_i' \
                      + str(iteration)
+    elif custom_file_name is not None:
+        output_name = custom_file_name
     output_file_path = os.path.join(output_location, output_name)
 
     if arcpy.Exists(output_file_path) == True:
@@ -1182,7 +1181,7 @@ def project(input_data, output_location, UTM_code, state_abbrev,
                              out_dataset=output_file_path,
                              out_coor_system="GEOGCS['GCS_WGS_1984',DATUM['D_WGS_1984',SPHEROID['WGS_1984',6378137.0,298.257223563]],PRIMEM['Greenwich',0.0],UNIT['Degree',0.0174532925199433]]",
                              transform_method="WGS_1984_(ITRF00)_To_NAD_1983",
-                             in_coor_system="PROJCS['NAD_1983_UTM_Zone_%sN',GEOGCS['GCS_North_American_1983',DATUM['D_North_American_1983',SPHEROID['GRS_1980',6378137.0,298.257222101]],PRIMEM['Greenwich',0.0],UNIT['Degree',0.0174532925199433]],PROJECTION['Transverse_Mercator'],PARAMETER['False_Easting',500000.0],PARAMETER['False_Northing',0.0],PARAMETER['Central_Meridian',%s],PARAMETER['Scale_Factor',0.9996],PARAMETER['Latitude_Of_Origin',0.0],UNIT['Meter',1.0]]" %(UTM, meridian),
+                             in_coor_system="PROJCS['NAD_1983_UTM_Zone_%sN',GEOGCS['GCS_North_American_1983',DATUM['D_North_American_1983',SPHEROID['GRS_1980',6378137.0,298.257222101]],PRIMEM['Greenwich',0.0],UNIT['Degree',0.0174532925199433]],PROJECTION['Transverse_Mercator'],PARAMETER['False_Easting',500000.0],PARAMETER['False_Northing',0.0],PARAMETER['Central_Meridian',%s],PARAMETER['Scale_Factor',0.9996],PARAMETER['Latitude_Of_Origin',0.0],UNIT['Meter',1.0]]" %(UTM_code, meridian),
                              preserve_shape="NO_PRESERVE_SHAPE", max_deviation="",
                              vertical="NO_VERTICAL")
                         
