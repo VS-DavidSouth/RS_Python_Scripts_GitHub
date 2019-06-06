@@ -239,4 +239,4 @@ if __name__ == '__main__':
                 
     print "\n\n---------------------\nSCRIPT COMPLETE!"
     print "The script took a total of", checkTime(), "."
-    print "---------------------"
+    print "----------------------"

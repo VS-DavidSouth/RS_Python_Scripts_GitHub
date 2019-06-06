@@ -1,4 +1,5 @@
-from Automated_Review import project, find_FIPS_UTM, county_outline_folder
+import resample_NAIP
+import Deleting_outdated_results
 import numpy as np
 import arcpy
 import os

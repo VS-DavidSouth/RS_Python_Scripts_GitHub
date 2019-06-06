@@ -5,8 +5,8 @@ import arcpy, os
 from Automated_Review import checkTime
 
 ## Input folder where Feature Analyst exports the shapefiles
-inputFolder = arcpy.GetParameterAsText(0)
-#inputFolder = r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst\Georgia\GA_Z17_c8'
+#inputFolder = arcpy.GetParameterAsText(0)
+inputFolder = r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst\Georgia\GA_Z17_c8'
 
 def walkFolder(folderLocation):
     
@@ -102,11 +102,11 @@ def transferToGDB(in_folder):
         new_name = findNewName(batch_file)
         arcpy.FeatureClassToFeatureClass_conversion(in_features=batch_file, out_path=out_GDB, out_name=new_name)
 
+if __name__ == '__main__':
+    transferToGDB(inputFolder)
 
-transferToGDB(inputFolder)
-
-print "Time to run:", checkTime()
-print "Completed!"
+    print "Time to run:", checkTime()
+    print "Completed!"
 
 
 
