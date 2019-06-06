@@ -844,7 +844,7 @@ def collapse_points(input_point_data, output_location, state_abbrev,
     :param output_location: The file path where the shiny new feature class will be saved.
     :param state_abbrev: Two-digit uppercase letter code of the relevant state as a string.
     :param county_name: The name of the relevant county as a string.
-    :return:
+    :return: The output file path.
     """
     # Get rid of any weird characters in the county name.
     county_name = nameFormat(county_name)
