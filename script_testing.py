@@ -1,5 +1,4 @@
-import resample_NAIP
-import Deleting_outdated_results
+from Automated_Review import *
 import numpy as np
 import arcpy
 import os

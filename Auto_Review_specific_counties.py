@@ -23,8 +23,8 @@ def single_step(func):
     without having to worry about tracking intermed_list, or skip_list.
     Note: This will override existing features, beware!
     Put the full function for func. For example:
-    clip(input_feature=filepath, clip_files=files, output_location=output,
-         state_abbrev="DC", county_name="District_of_Colombia")
+    single_step(clip(input_feature=filepath, clip_files=files, output_location=output,
+         state_abbrev="DC", county_name="District_of_Colombia"))
     Of course, you can't use DC as a state because DC is not a state and has
     taxation without representation despite a population of 700,000+, greater than
     the entire population of Vermont or Wyoming. But good thing the US split Dakatoa
@@ -45,7 +45,7 @@ def single_county(batch_file, iteration_number=None):
     Note that this uses skip_list from the Automated_Review script, so
     if you don't want something to be skipped, change it there and save it.
     :param batch_file: file path to the relevant batch_file
-    :param iteration_number: optional iteration number. Untested.
+    :param iteration_number: optional iteration number. UNTESTED.
     :return: file path to AutoReview file.
     """
     global neg_masks
