@@ -49,14 +49,12 @@ arcpy.env.OverwriteOutput = True
 # pathways to source data (hybrid model results, ground truth results, and the county outlines).
 
 #########Change these Variables#########
-State_Name = 'Minnesota' 
-State_Abbrev = 'MN' 
-County_Name = 'Redwood' 
+State_Name = 'Arkansas' 
+State_Abbrev = 'AR' 
+County_Name = 'Cluster' 
 
 ##########Keep these Variables##########
-Automated_Review_ResultsPath = r'R:\Nat_Hybrid_Poultry\Results\Automated_Review_Results/'
-TP_FN_FPPath = r'O:\AI Modeling Coop Agreement 2017\David_working\Remote_Sensing_Procedure\TP_FN_FP.gdb/' # won't be used, hopefully
-CountyOutlinesPath = r'N:\Remote Sensing Projects\2016 Cooperative Agreement Poultry Barns\Documents\Deliverables\Library\CountyOutlines/'
+CountyOutlinesPath = r'O:\AI Modeling Coop Agreement 2017\Grace Cap Stone Validation\Validation_Results\Cluster_Outlines.gdb/'
 
 TP_FNPath = r'O:\AI Modeling Coop Agreement 2017\Grace Cap Stone Validation\Validation_Results\TP_FN_Counties/' # added the four coutnies. Hopefully it won't matter that the fields are different than the rest.
 AutoReviewPath = r'O:\AI Modeling Coop Agreement 2017\Grace Cap Stone Validation\Validation_Results\AutoReviewCounties.gdb/' # Don't add counties to this GDB, it is populated automatically.
@@ -92,11 +90,13 @@ def tableToCSV(Input_Table, Filepath):
 # Pull ground truth points, hybrid model points, and county outlines from their sources.
 
 County_Outline = County_Name + 'Co' + State_Abbrev + '_outline'
-TP_FN_FP = State_Abbrev + '_' + County_Name + '_TP_FN_FP'
-AutoReviewSource = 'AutoReview_' + State_Abbrev + '_' + County_Name
-source_data_list = {CountyOutlinesPath + State_Name + '.gdb/' + County_Outline : County_Outline,\
-                    TP_FN_FPPath + TP_FN_FP : TP_FN_FP,\
-                    Automated_Review_ResultsPath + State_Name + '.gdb/' + AutoReviewSource : AutoReviewSource}
+TP_FN = State_Abbrev + '_' + County_Name + '_TP_FN'
+AutoReview = State_Abbrev + '_' + County_Name + '_AutoReview'
+FLAPS = State_Abbrev + '_' + County_Name + '_FLAPS'
+source_data_list = {CountyOutlinesPath + County_Outline : County_Outline,\
+                    TP_FNPath + TP_FN + '.shp': TP_FN,\
+                    AutoReviewPath + AutoReview : AutoReview,\
+                    FLAPSPath + FLAPS : FLAPS}
 
 for source_data in source_data_list:
     if arcpy.Exists(source_data):
@@ -104,64 +104,7 @@ for source_data in source_data_list:
     else:
         print ("Error: source layer does not exist.", source_data)
 
-print("source layers created")
-
-# Change the projection of the hybrid model layer to match that of the ground truth layer and save it
-# as a new layer in the "AutoReviewCounties" geodatabase in the "Validation_Results" folder.
-AutoReview = State_Abbrev + '_' + County_Name + '_AutoReview'
-
-centralMeridian = {'10' : '-123.0', '11' : '-117.0', '12' : '-111.0', '13' : '-105.0',
-                   '14' : '-99.0',  '15' : '-93.0',  '16' : '-87.0',  '17' : '-81.0',
-                   '18' : '-75.0',  '19' : '-69.0', }
-if arcpy.Exists(AutoReviewPath + AutoReview) == True:
-   print ("projected AutoReview already exists")
-else:
-   FIPS, UTM = find_FIPS_UTM(CountyOutlinesPath + State_Name + '.gdb/' + County_Outline)
-   arcpy.Project_management(AutoReviewSource,AutoReviewPath + AutoReview,\
-                "PROJCS['NAD_1983_UTM_Zone_" + UTM + "N',\
-                GEOGCS['GCS_North_American_1983',DATUM['D_North_American_1983',\
-                SPHEROID['GRS_1980',6378137.0,298.257222101]],PRIMEM['Greenwich',0.0],\
-                UNIT['Degree',0.0174532925199433]],PROJECTION['Transverse_Mercator'],\
-                PARAMETER['False_Easting',500000.0],PARAMETER['False_Northing',0.0],\
-                PARAMETER['Central_Meridian'," + centralMeridian[UTM] + "],PARAMETER['Scale_Factor',0.9996],\
-                PARAMETER['Latitude_Of_Origin',0.0],UNIT['Meter',1.0]];17410.045707 4262033.695016 3906.249996;\
-                0.000000 100000.000000;0.000000 100000.000000")
-   print ("new AutoReview projection complete")
-      
-# Create FLAPS dataset for county from national model using select by location and the county
-# outline layer.
-FLAPS = State_Abbrev + '_' + County_Name + '_FLAPS'
-
-poultry_list = ["Layers","Pullets","Turkeys","Broilers"]
-for poultry_type in poultry_list:
-   arcpy.MakeFeatureLayer_management(FLAPSPath + poultry_type, poultry_type)
-   arcpy.SelectLayerByLocation_management(poultry_type,"COMPLETELY_WITHIN",County_Outline,"","NEW_SELECTION","")
-
-if arcpy.Exists(FLAPSPath + FLAPS) == True:
-   print ("new FLAPS layer already exists")
-else:
-   arcpy.Merge_management(poultry_list,FLAPSPath+FLAPS+'_pre_project',"")
-   arcpy.Project_management(FLAPSPath + FLAPS + '_pre_project',FLAPSPath + FLAPS,\
-                "PROJCS['NAD_1983_UTM_Zone_" + UTM + "N',\
-                GEOGCS['GCS_North_American_1983',DATUM['D_North_American_1983',\
-                SPHEROID['GRS_1980',6378137.0,298.257222101]],PRIMEM['Greenwich',0.0],\
-                UNIT['Degree',0.0174532925199433]],PROJECTION['Transverse_Mercator'],\
-                PARAMETER['False_Easting',500000.0],PARAMETER['False_Northing',0.0],\
-                PARAMETER['Central_Meridian'," + centralMeridian[UTM] + "],PARAMETER['Scale_Factor',0.9996],\
-                PARAMETER['Latitude_Of_Origin',0.0],UNIT['Meter',1.0]];17410.045707 4262033.695016 3906.249996;\
-                0.000000 100000.000000;0.000000 100000.000000")
-   print ("new FLAPS layer created")
-      
-# Select points from ground truth layer that are true positives or false negatives, then export them
-# as a shape file into the "TP_FN_Counties" folder in the "Validation_Results" folder.
-TP_FN = State_Abbrev + '_' + County_Name + '_TP_FN'
-
-if arcpy.Exists(TP_FNPath+TP_FN+'.shp') == True:
-   print ("new TP_FN layer already exists")
-else:
-   arcpy.SelectLayerByAttribute_management (TP_FN_FP, "NEW_SELECTION", "TP_FN_FP <>3")
-   arcpy.FeatureClassToFeatureClass_conversion(TP_FN_FP,TP_FNPath,TP_FN + '.shp')
-   print ("new TP_FN layer made")
+print("source layers created")      
       
 ########################################
 ##############GRID DENSITY##############
@@ -221,7 +164,6 @@ Ellipse_Size_List = ['3000','10000','20000']
 
 Ellipses = []
 for Data_Type in Input_List:
-   arcpy.MakeFeatureLayer_management(Data_Type,Input_List[Data_Type])
    for Ellipse_Size in Ellipse_Size_List:
       if arcpy.Exists(Cell_AssignmentsPath + Input_List[Data_Type] + '_Cell_' + Ellipse_Size) == True:
          Ellipses.append(Input_List[Data_Type] + '_Ellipse_' + Ellipse_Size)
@@ -275,31 +217,6 @@ for Ellipse in Ellipses:
       tableToCSV(EllipsePath + Ellipse,Ellipse_CSVPath + Ellipse + '.csv')
   
 
-########################################
-############DISTANCE ANALYSIS###########
-########################################
-
-# Create two tables in the "Dist_Between_Tables" geodatabase with distances between all points in the
-# hybrid model and distances between all points in the ground truth layer.
-
-Distances = []
-for Data_Type in Input_List:  ## DS: This loop was modified to check for existing files.
-    dist_file_path = NearTablePath + Input_List[Data_Type] + '_Distance'
-    if arcpy.Exists(dist_file_path):
-        print "File already exists:", dist_file_path
-    else:
-        arcpy.GenerateNearTable_analysis(Data_Type, Data_Type, dist_file_path, "", "LOCATION", "NO_ANGLE", "ALL", "", "PLANAR")
-        Distances.append(Input_List[Data_Type] + '_Distance')
-
-print ("distances between farms calculated")   
-#########################################################################################################
-# Export distance between farms tables to .csv files.
-
-Distance_CSVPath = r'O:\AI Modeling Coop Agreement 2017\Grace Cap Stone Validation\Validation_Results\Distances/'
-
-for Distance in Distances:
-   tableToCSV(NearTablePath + Distance,Distance_CSVPath + Distance + '.csv')
-  
 #########################################################################################################
 #########################################################################################################
 # Generate buffers around ground truth points of 100, 500, 1000, 2000, and 5000 meters. Then use the
@@ -308,25 +225,14 @@ for Distance in Distances:
 
 Captures = []
 Buffer_Size_List = ['100','500','1000','2000','5000']
-for Buffer_Size in Buffer_Size_List:    ## DS: this loop was modified to check to see if the files already existed.
-    buf_file_path = BuffersPath + State_Abbrev + '_' + County_Name + '_Buffer_' + Buffer_Size
-    if arcpy.Exists(buf_file_path):
-        print "File already exists:", buf_file_path
-    else:
-        arcpy.Buffer_analysis(TP_FNPath + TP_FN + ".shp", buf_file_path,\
+for Buffer_Size in Buffer_Size_List:
+   arcpy.Buffer_analysis(TP_FNPath + TP_FN + ".shp",BuffersPath + State_Abbrev + '_' + County_Name + '_Buffer_' + Buffer_Size,\
                          Buffer_Size,"FULL","","NONE","","PLANAR")
-    for Model_Type in Model_List:
-        join_buf_file_path = Buffer_CapturePath + Model_List[Model_Type] + '_Capture_' + Buffer_Size
-        if arcpy.Exists(join_buf_file_path):
-            print "File already exists:", join_buf_file_path
-        else:
-            ## DS: if you are getting an error around this part, it might be because you added data to the
-            ##     TP_FN GDB, and it wasn't projected. It might create a buf_file_path shapefile with
-            ##     buffers larger than the earth. Double check that.
-            arcpy.SpatialJoin_analysis(buf_file_path,\
-                                     Model_Type,join_buf_file_path,\
-                                     "JOIN_ONE_TO_ONE", "KEEP_ALL", "", "COMPLETELY_CONTAINS", "", "")
-            Captures.append(Model_List[Model_Type] + '_Capture_' + Buffer_Size)
+   for Model_Type in Model_List:
+      arcpy.SpatialJoin_analysis(BuffersPath + State_Abbrev + '_' + County_Name + '_Buffer_' + Buffer_Size,\
+                                 Model_Type,Buffer_CapturePath + Model_List[Model_Type] + '_Capture_' + Buffer_Size,\
+                                 "JOIN_ONE_TO_ONE","KEEP_ALL","","COMPLETELY_CONTAINS","","")
+      Captures.append(Model_List[Model_Type] + '_Capture_' + Buffer_Size)
 
 print ("buffer captures finished")
 #########################################################################################################

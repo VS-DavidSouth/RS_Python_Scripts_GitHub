@@ -13,7 +13,8 @@
 #      and figures will be produced for communicating results. An analysis of distances between farms
 #      are also included. 
 #
-
+# DS notes: it should probably be documented that the user should install the tidyverse, data.table, and
+#           gsubfn packages. 
 
 ########################################
 ##################SETUP#################
@@ -27,11 +28,13 @@ library(gsubfn)
 ##############GRID DENSITY##############
 ########################################
 
-# grid_density_home <- "C:/Users/GKuiper/Desktop/Grid_Density"
 grid_density_home <- "O:/AI Modeling Coop Agreement 2017/Grace Cap Stone Validation/Validation_Results/Grid_Density"
 
 grids <- list.files(path=grid_density_home, full.names = T, recursive = F)
-
+####for cluster analysis:
+#grids <- grids[grepl(c("AR_Cluster","AR_Yell","AR_Logan","AR_Scott"),grids)]
+####for regular validation analysis:
+grids <- grids[!grepl(c("Cluster"),grids)]
 AutoReview_grids <- data.frame()
 TP_FN_grids <- data.frame()
 FLAPS_grids <- data.frame()
@@ -65,19 +68,27 @@ for (i in 1:length(grids)) {
 #      number of points for that model within the county.
 AutoReview_counts <- AutoReview_grids %>%
   mutate(Count_AutoReview=Join_Count) %>%
-  select(1,13:16) %>%
+  select(OBJECTID,Shape_Length,Shape_Area,County,Count_AutoReview) %>%
   group_by(County,Shape_Length) %>%
   mutate(Prop_AutoReview=(Count_AutoReview/sum(Count_AutoReview)))
 
 TP_FN_counts <- TP_FN_grids %>%
-  mutate(Count_TP_FN=Join_Count) %>%
-  select(1,19:21,24) %>%
+  mutate(Count_TP_FN=Join_Count) %>% ## DS: For some reason, "Count_TP_FN" is causing problems.
+  #select(1,19:21,24) %>%
+  select(OBJECTID,Shape_Length,Shape_Area,County,Count_TP_FN) %>% ## The problem was that this select
+  #line previously selected by column number, versus by column name. Some of the new counties must have
+  #more or different variables, because there are more columns than there used to be in the TP_FN_grids.
+  #as a results, column 24 used to be the new "Count_TP_FN" variable created in line 74; with the new
+  #counties, column 24 is actually a variable called "ICOUNT_1". So, line 75 was selectin "ICOUNT_1"
+  #instead of "Count_TP_FN", and then the results dataframe that was piped into line 84 didn't have a
+  #Count_TP_FN variable with which to calculate Prop_TP_FN. I've solved the problem by selecting by
+  #variable name in line 76, instead of column number. Let me know if you have any questions. ~Grace
   group_by(County,Shape_Length) %>%
   mutate(Prop_TP_FN=(Count_TP_FN/sum(Count_TP_FN)))
   
 FLAPS_counts <- FLAPS_grids %>%
   mutate(Count_FLAPS=Join_Count) %>%
-  select(1,14:17) %>%
+  select(OBJECTID,Shape_Length,Shape_Area,County,Count_FLAPS) %>%
   group_by(County,Shape_Length) %>%
   mutate(Prop_FLAPS=(Count_FLAPS/sum(Count_FLAPS)))
 
@@ -170,10 +181,14 @@ legend(x=1.5,y=39.5,title="Model compared to truth",legend=c("Hybrid","FLAPS"),
 ############ELLIPSE OVERLAP#############
 ########################################
 
-ellipse_home <- "C:/Users/GKuiper/Desktop/Ellipses"
+#ellipse_home <- "C:/Users/GKuiper/Desktop/Ellipses"  ## DS: original
+ellipse_home <- "O:/AI Modeling Coop Agreement 2017/Grace Cap Stone Validation/Validation_Results/Ellipses"  ## DS: altered
 
 ellipses <- list.files(path=ellipse_home, full.names = T, recursive = F)
-
+####for cluster analysis:
+#ellipses <- ellipses[grepl("Cluster",ellipses)]
+####for regular validation analysis:
+ellipses <- ellipses[!grepl("Cluster",ellipses)]
 TP_FN_ellipse <- data.frame()
 AutoReview_ellipse <- data.frame()
 FLAPS_ellipse <- data.frame()
@@ -219,6 +234,7 @@ for (i in 1:length(ellipses)) {
     FLAPS_intersection <- rbind(FLAPS_intersection,FLAPS,fill=TRUE)
   }
 }
+
 
 #      Eliminate unnecessary fields (select County, Ellipse_Size, and Shape_Area; rename 
 #      Shape_Area variable to include model type and ellipse vs. intersection (e.g.
@@ -275,7 +291,7 @@ Ellipse_areas <- merge(Ellipse_areas,FLAPS_intersection,by = c("County","Ellipse
 #      hybrid ellipse areas and the proportion of the hybrid intersection areas out
 #      of the total hybrid ellipse areas.
 Ellipse_areas_differences <- Ellipse_areas %>%
-  group_by(County,Ellipse_Size) %>%
+  group_by(Ellipse_Size) %>%
   mutate(intersection_FLAPS_prop = (FLAPS_intersection_area/TP_FN_ellipse_area) * (FLAPS_intersection_area/FLAPS_ellipse_area)) %>%
   mutate(intersection_AutoReview_prop = (AutoReview_intersection_area/TP_FN_ellipse_area) * (AutoReview_intersection_area/AutoReview_ellipse_area))
 
@@ -284,13 +300,13 @@ Ellipse_areas_differences <- Ellipse_areas %>%
 Ellipse_plots_data <- gather(Ellipse_areas_differences[,c(1,2,8,9)],model, proportion_overlap, intersection_FLAPS_prop:intersection_AutoReview_prop, factor_key=TRUE)
 
 Ellipse_plots_data_10000 <- Ellipse_plots_data %>%
-  filter(Ellipse_Size==10000) %>%
+  filter(Ellipse_Size=="10000") %>%
   mutate(Ellipse_Size_="10000 meters")
 Ellipse_plots_data_20000 <- Ellipse_plots_data %>%
-  filter(Ellipse_Size==20000) %>%
+  filter(Ellipse_Size=="20000") %>%
   mutate(Ellipse_Size_="20000 meters")
 Ellipse_plots_data_3000 <- Ellipse_plots_data %>%
-  filter(Ellipse_Size==3000) %>%
+  filter(Ellipse_Size=="3000") %>%
   mutate(Ellipse_Size_=" 3000 meters")
 
 Ellipse_plots_data <- rbind(Ellipse_plots_data_3000,Ellipse_plots_data_10000)
@@ -320,14 +336,45 @@ Ellipse_plot + theme(strip.text.x = element_text(size=16, face="bold")) +
                                      vjust=1,
                                      hjust=1))
 
+# Ellipse_areas_proportions_10000 <- gather(Ellipse_areas[1,c(3,6,7)],model,overlapped,
+#                                           AutoReview_intersection_area:FLAPS_intersection_area,
+#                                           factor_key=TRUE)
+# Ellipse_areas_proportions_10000<-Ellipse_areas_proportions_10000[,c(1,3)] %>%
+#   mutate(not_overlapped=TP_FN_ellipse_area-overlapped) %>%
+#   select(overlapped,not_overlapped)
+# rownames(Ellipse_areas_proportions_10000) <- c("AutoReview","FLAPS")
+# Ellipse_areas_proportions_10000<-as.matrix(Ellipse_areas_proportions_10000)
+# prop.test(Ellipse_areas_proportions_10000)
+# 
+# Ellipse_areas_proportions_20000 <- gather(Ellipse_areas[2,c(3,6,7)],model,overlapped,
+#                                           AutoReview_intersection_area:FLAPS_intersection_area,
+#                                           factor_key=TRUE)
+# Ellipse_areas_proportions_20000<-Ellipse_areas_proportions_20000[,c(1,3)] %>%
+#   mutate(not_overlapped=TP_FN_ellipse_area-overlapped) %>%
+#   select(overlapped,not_overlapped)
+# rownames(Ellipse_areas_proportions_20000) <- c("AutoReview","FLAPS")
+# Ellipse_areas_proportions_20000<-as.matrix(Ellipse_areas_proportions_20000)
+# prop.test(Ellipse_areas_proportions_20000)
+# 
+# Ellipse_areas_proportions_3000 <- gather(Ellipse_areas[3,c(3,6,7)],model,overlapped,
+#                                           AutoReview_intersection_area:FLAPS_intersection_area,
+#                                           factor_key=TRUE)
+# Ellipse_areas_proportions_3000<-Ellipse_areas_proportions_3000[,c(1,3)] %>%
+#   mutate(not_overlapped=TP_FN_ellipse_area-overlapped) %>%
+#   select(overlapped,not_overlapped)
+# rownames(Ellipse_areas_proportions_3000) <- c("AutoReview","FLAPS")
+# Ellipse_areas_proportions_3000<-as.matrix(Ellipse_areas_proportions_3000)
+# prop.test(Ellipse_areas_proportions_3000)
+# 
 ########################################
-############ELLIPSE OVERLAP#############
+############BUFFER CAPTURE##############
 ########################################
 
-buffers_home <- "C:/Users/GKuiper/Desktop/Buffer_Capture"
-
+#buffers_home <- "C:/Users/GKuiper/Desktop/Buffer_Capture"  ## DS: original
+buffers_home <- "O:/AI Modeling Coop Agreement 2017/Grace Cap Stone Validation/Validation_Results/Buffer_Capture" ## DS - altered
 buffers <- list.files(path=buffers_home, full.names = T, recursive = F)
-
+####for regular validation analysis (not cluster):
+buffers <- buffers[!grepl("Cluster",buffers)]
 AutoReview_capture <- data.frame()
 FLAPS_capture <- data.frame()
 
@@ -441,7 +488,8 @@ legend(x=10,y=49700,title="Model captured",legend=c("Hybrid","FLAPS"),
 ########################################
 ########DISTANCES BETWEEN FARMS#########
 ########################################
-distances_home <- "C:/Users/GKuiper/Desktop/Distances"
+#distances_home <- "C:/Users/GKuiper/Desktop/Distances"  ## DS: original
+distances_home <- "O:/AI Modeling Coop Agreement 2017/Grace Cap Stone Validation/Validation_Results/Distances"  ## DS: edited
 
 distances <- list.files(path=distances_home, full.names = T, recursive = F)
 
