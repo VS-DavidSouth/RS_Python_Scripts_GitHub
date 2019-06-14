@@ -226,7 +226,7 @@ RMSE_plot <- RMSE_plot[with(RMSE_plot,order(Shape_Length)),]
 par(mar=c(6, 4.5, 4, 5.5) + 0.1)
 
 RMSE_rows_prop_AutoReview_counties <- rownames(RMSE_plot[RMSE_plot$prop_model=="RMSE_Prop_AutoReview" & 
-                                                  RMSE_plot$model == "AutoReview for counties",])
+                                                           RMSE_plot$model == "AutoReview for counties",])
 RMSE_rows_prop_FLAPS_counties <- rownames(RMSE_plot[RMSE_plot$prop_model=="RMSE_Prop_FLAPS" &
                                                       RMSE_plot$model == "FLAPS for counties",])
 plot(RMSE_plot[c(RMSE_rows_prop_AutoReview_counties),"Shape_Length"],
@@ -240,9 +240,9 @@ lines(RMSE_plot[c(RMSE_rows_prop_FLAPS_counties),"Shape_Length"],
       RMSE_plot[c(RMSE_rows_prop_FLAPS_counties),"RMSE_prop"],
       type="o", pch=22, cex=0.8, lty=2, col="#e66101")
 RMSE_rows_prop_AutoReview_cluster <- rownames(RMSE_plot[RMSE_plot$prop_model=="RMSE_Prop_AutoReview" & 
-                                                           RMSE_plot$model == "AutoReview for cluster",])
+                                                          RMSE_plot$model == "AutoReview for cluster",])
 RMSE_rows_prop_FLAPS_cluster <- rownames(RMSE_plot[RMSE_plot$prop_model=="RMSE_Prop_FLAPS" &
-                                                      RMSE_plot$model == "FLAPS for cluster",])
+                                                     RMSE_plot$model == "FLAPS for cluster",])
 lines(RMSE_plot[c(RMSE_rows_prop_AutoReview_cluster),"Shape_Length"],
       RMSE_plot[c(RMSE_rows_prop_AutoReview_cluster),"RMSE_prop"],
       type="b", pch=16, cex=0.8, lty=1, col="#fdb863")
@@ -264,9 +264,9 @@ lines(RMSE_plot[c(RMSE_rows_count_FLAPS_counties),"Shape_Length"],
       RMSE_plot[c(RMSE_rows_count_FLAPS_counties),"RMSE_count"],
       type="o", pch=22, cex=0.8,lty=2, col="#5e3c99")
 RMSE_rows_count_AutoReview_cluster <- rownames(RMSE_plot[RMSE_plot$count_model=="RMSE_Count_AutoReview" &
-                                                            RMSE_plot$model == "AutoReview for cluster",])
+                                                           RMSE_plot$model == "AutoReview for cluster",])
 RMSE_rows_count_FLAPS_cluster <- rownames(RMSE_plot[RMSE_plot$count_model=="RMSE_Count_FLAPS" &
-                                                       RMSE_plot$model=="FLAPS for cluster",])
+                                                      RMSE_plot$model=="FLAPS for cluster",])
 lines(RMSE_plot[c(RMSE_rows_count_AutoReview_cluster),"Shape_Length"],
       RMSE_plot[c(RMSE_rows_count_AutoReview_cluster),"RMSE_count"],
       type="b", pch=16, cex=0.8,lty=1, col="#b2abd2")
@@ -338,282 +338,95 @@ for (i in 1:length(ellipses)) {
   }
 }
 
-AutoReview_intersection_counties <- AutoReview_intersection[which(AutoReview_intersection$County!="AR_Cluster"),]
-AutoReview_intersection_cluster <- AutoReview_intersection[which(AutoReview_intersection$County=="AR_Cluster"),]
+TP_FN_ellipse <- select(TP_FN_ellipse,County,Ellipse_Size,Shape_Area)
+AutoReview_ellipse <- select(AutoReview_ellipse,County,Ellipse_Size,Shape_Area)
+FLAPS_ellipse <- select(FLAPS_ellipse,County,Ellipse_Size,Shape_Area)
+AutoReview_intersection <- select(AutoReview_intersection,County,Ellipse_Size,Shape_Area)
+FLAPS_intersection <- select(FLAPS_intersection,County,Ellipse_Size,Shape_Area)
 
-AutoReview_ellipse_counties <- AutoReview_ellipse[which(AutoReview_ellipse$County!="AR_Cluster"),]
-AutoReview_ellipse_cluster <- AutoReview_ellipse[which(AutoReview_ellipse$County=="AR_Cluster"),]
+TP_FN_ellipse[is.na(TP_FN_ellipse)] = 0
+AutoReview_ellipse[is.na(AutoReview_ellipse)] = 0
+FLAPS_ellipse[is.na(FLAPS_ellipse)] = 0
+AutoReview_intersection[is.na(AutoReview_intersection)] = 0
+FLAPS_intersection[is.na(FLAPS_intersection)] = 0
 
-TP_FN_ellipse_counties <- TP_FN_ellipse[which(TP_FN_ellipse$County!="AR_Cluster"),]
-TP_FN_ellipse_cluster <- TP_FN_ellipse[which(TP_FN_ellipse$County=="AR_Cluster"),]
+TP_FN_ellipse <- aggregate(TP_FN_ellipse[,"Shape_Area"],
+                                    by=TP_FN_ellipse[,c("County","Ellipse_Size")],
+                                    FUN=sum)
+TP_FN_ellipse$TP_FN_ellipse<-TP_FN_ellipse$Shape_Area
+TP_FN_ellipse$Shape_Area<- NULL
 
-FLAPS_intersection_counties <- FLAPS_intersection[which(FLAPS_intersection$County!="AR_Cluster"),]
-FLAPS_intersection_cluster <- FLAPS_intersection[which(FLAPS_intersection$County=="AR_Cluster"),]
+FLAPS_ellipse <- aggregate(FLAPS_ellipse[,"Shape_Area"],
+                                    by=FLAPS_ellipse[,c("County","Ellipse_Size")],
+                                    FUN=sum)
+FLAPS_ellipse$FLAPS_ellipse<-FLAPS_ellipse$Shape_Area
+FLAPS_ellipse$Shape_Area<-NULL
 
-FLAPS_ellipse_counties <- FLAPS_ellipse[which(FLAPS_ellipse$County!="AR_Cluster"),]
-FLAPS_ellipse_cluster <- FLAPS_ellipse[which(FLAPS_ellipse$County=="AR_Cluster"),]
+AutoReview_ellipse <- aggregate(AutoReview_ellipse[,"Shape_Area"],
+                                         by=AutoReview_ellipse[,c("County","Ellipse_Size")],
+                                         FUN=sum)
+AutoReview_ellipse$AutoReview_ellipse<-AutoReview_ellipse$Shape_Area
+AutoReview_ellipse$Shape_Area<-NULL
 
-#      Eliminate unnecessary fields (select County, Ellipse_Size, and Shape_Area; rename 
-#      Shape_Area variable to include model type and ellipse vs. intersection (e.g.
-#      TP_FN_ellipse_area); calculate total areas of ellipses or intesections for each
-#      county by model type (FLAPS or hybrid) or ground truth
-TP_FN_ellipse_counties <- select(TP_FN_ellipse_counties,County,Ellipse_Size,Shape_Area)
-AutoReview_ellipse_counties <- select(AutoReview_ellipse_counties,County,Ellipse_Size,Shape_Area)
-FLAPS_ellipse_counties <- select(FLAPS_ellipse_counties,County,Ellipse_Size,Shape_Area)
-AutoReview_intersection_counties <- select(AutoReview_intersection_counties,County,Ellipse_Size,Shape_Area)
-FLAPS_intersection_counties <- select(FLAPS_intersection_counties,County,Ellipse_Size,Shape_Area)
+FLAPS_intersection <- aggregate(FLAPS_intersection[,"Shape_Area"],
+                                         by=FLAPS_intersection[,c("County","Ellipse_Size")],
+                                         FUN=sum)
+FLAPS_intersection$FLAPS_intersection<-FLAPS_intersection$Shape_Area
+FLAPS_intersection$Shape_Area<-NULL
 
-TP_FN_ellipse_cluster <- select(TP_FN_ellipse_cluster,County,Ellipse_Size,Shape_Area)
-AutoReview_ellipse_cluster <- select(AutoReview_ellipse_cluster,County,Ellipse_Size,Shape_Area)
-FLAPS_ellipse_cluster <- select(FLAPS_ellipse_cluster,County,Ellipse_Size,Shape_Area)
-AutoReview_intersection_cluster <- select(AutoReview_intersection_cluster,County,Ellipse_Size,Shape_Area)
-FLAPS_intersection_cluster <- select(FLAPS_intersection_cluster,County,Ellipse_Size,Shape_Area)
+AutoReview_intersection <- aggregate(AutoReview_intersection[,"Shape_Area"],
+                                              by=AutoReview_intersection[,c("County","Ellipse_Size")],
+                                              FUN=sum)
+AutoReview_intersection$AutoReview_intersection<-AutoReview_intersection$Shape_Area
+AutoReview_intersection$Shape_Area<-NULL
 
-#      Calculate total ellipse intersection areas per county at each ellipse size
-#      by summing by County and Ellipse_Size.
-TP_FN_ellipse_counties <- aggregate(TP_FN_ellipse_counties[,"Shape_Area"],
-                                by=TP_FN_ellipse_counties[,c("County","Ellipse_Size")],
-                                FUN=sum)
-FLAPS_ellipse_counties <- aggregate(FLAPS_ellipse_counties[,"Shape_Area"],
-                           by=FLAPS_ellipse_counties[,c("County","Ellipse_Size")],
-                           FUN=sum)
-AutoReview_ellipse_counties <- aggregate(AutoReview_ellipse_counties[,"Shape_Area"],
-                           by=AutoReview_ellipse_counties[,c("County","Ellipse_Size")],
-                           FUN=sum)
-FLAPS_intersection_counties <- aggregate(FLAPS_intersection_counties[,"Shape_Area"],
-                           by=FLAPS_intersection_counties[,c("County","Ellipse_Size")],
-                           FUN=sum)
-AutoReview_intersection_counties <- aggregate(AutoReview_intersection_counties[,"Shape_Area"],
-                           by=AutoReview_intersection_counties[,c("County","Ellipse_Size")],
-                           FUN=sum)
+Ellipse_intersection_areas_AutoReview <- merge(AutoReview_intersection, AutoReview_ellipse, by=c("County","Ellipse_Size"),all=TRUE)
+Ellipse_intersection_areas_AutoReview <- merge(Ellipse_intersection_areas_AutoReview, TP_FN_ellipse, by=c("County","Ellipse_Size"),all=TRUE)
+Ellipse_intersection_areas_FLAPS <- merge(FLAPS_intersection, FLAPS_ellipse, by=c("County","Ellipse_Size"),all=TRUE)
+Ellipse_intersection_areas_FLAPS <- merge(Ellipse_intersection_areas_FLAPS, TP_FN_ellipse, by=c("County","Ellipse_Size"),all=TRUE)
+Ellipse_intersection_areas_AutoReview[is.na(Ellipse_intersection_areas_AutoReview)] = 0
+Ellipse_intersection_areas_FLAPS[is.na(Ellipse_intersection_areas_FLAPS)] = 0
 
-TP_FN_ellipse_cluster <- aggregate(TP_FN_ellipse_cluster[,"Shape_Area"],
-                           by=TP_FN_ellipse_cluster[,c("County","Ellipse_Size")],
-                           FUN=sum)
-FLAPS_ellipse_cluster <- aggregate(FLAPS_ellipse_cluster[,"Shape_Area"],
-                           by=FLAPS_ellipse_cluster[,c("County","Ellipse_Size")],
-                           FUN=sum)
-AutoReview_ellipse_cluster <- aggregate(AutoReview_ellipse_cluster[,"Shape_Area"],
-                                by=AutoReview_ellipse_cluster[,c("County","Ellipse_Size")],
-                                FUN=sum)
-FLAPS_intersection_cluster <- aggregate(FLAPS_intersection_cluster[,"Shape_Area"],
-                                by=FLAPS_intersection_cluster[,c("County","Ellipse_Size")],
-                                FUN=sum)
-AutoReview_intersection_cluster <- aggregate(AutoReview_intersection_cluster[,"Shape_Area"],
-                                     by=AutoReview_intersection_cluster[,c("County","Ellipse_Size")],
-                                     FUN=sum)
+for (i in 1:nrow(Ellipse_intersection_areas_AutoReview)) {
+  if (grepl(".csv",Ellipse_intersection_areas_AutoReview[i,"Ellipse_Size"])) {
+    Ellipse_intersection_areas_AutoReview[i,"Ellipse_Size"]=sub(".csv.*","",Ellipse_intersection_areas_AutoReview[i,"Ellipse_Size"])
+  }
+}
+for (i in 1:nrow(Ellipse_intersection_areas_FLAPS)) {
+  if (grepl(".csv",Ellipse_intersection_areas_FLAPS[i,"Ellipse_Size"])) {
+    Ellipse_intersection_areas_FLAPS[i,"Ellipse_Size"]=sub(".csv.*","",Ellipse_intersection_areas_FLAPS[i,"Ellipse_Size"])
+  }
+}
 
-TP_FN_ellipse_counties <- TP_FN_ellipse_counties %>%
-  mutate(TP_FN_ellipse_area=Shape_Area) %>%
-  select(-3)
-AutoReview_ellipse_counties <- AutoReview_ellipse_counties %>%
-  mutate(AutoReview_ellipse_area=Shape_Area) %>%
-  select(-3)
-FLAPS_ellipse_counties <- FLAPS_ellipse_counties %>%
-  mutate(FLAPS_ellipse_area=Shape_Area) %>%
-  select(-3)
-AutoReview_intersection_counties <- AutoReview_intersection_counties %>%
-  mutate(AutoReview_intersection_area=Shape_Area) %>%
-  select(-3)
-FLAPS_intersection_counties <- FLAPS_intersection_counties %>%
-  mutate(FLAPS_intersection_area=Shape_Area) %>%
-  select(-3)
+Ellipse_intersection_areas_AutoReview <- Ellipse_intersection_areas_AutoReview %>%
+  mutate(not_overlapped_TP_FN=TP_FN_ellipse-AutoReview_intersection) %>%
+  mutate(not_overlapped_AutoReview=AutoReview_ellipse-AutoReview_intersection) %>%
+  select(not_overlapped_AutoReview,not_overlapped_TP_FN,AutoReview_intersection,County,Ellipse_Size)
+Ellipse_intersection_areas_FLAPS <- Ellipse_intersection_areas_FLAPS %>%
+  mutate(not_overlapped_TP_FN=TP_FN_ellipse-FLAPS_intersection) %>%
+  mutate(not_overlapped_FLAPS=FLAPS_ellipse-FLAPS_intersection) %>%
+  select(not_overlapped_FLAPS,not_overlapped_TP_FN,FLAPS_intersection,County,Ellipse_Size)
 
-TP_FN_ellipse_cluster <- TP_FN_ellipse_cluster %>%
-  mutate(TP_FN_ellipse_area=Shape_Area) %>%
-  select(-3)
-AutoReview_ellipse_cluster <- AutoReview_ellipse_cluster %>%
-  mutate(AutoReview_ellipse_area=Shape_Area) %>%
-  select(-3)
-FLAPS_ellipse_cluster <- FLAPS_ellipse_cluster %>%
-  mutate(FLAPS_ellipse_area=Shape_Area) %>%
-  select(-3)
-AutoReview_intersection_cluster <- AutoReview_intersection_cluster %>%
-  mutate(AutoReview_intersection_area=Shape_Area) %>%
-  select(-3)
-FLAPS_intersection_cluster <- FLAPS_intersection_cluster %>%
-  mutate(FLAPS_intersection_area=Shape_Area) %>%
-  select(-3)
+AutoReview_areas_10000<-Ellipse_intersection_areas_AutoReview %>%
+  filter(Ellipse_Size=="10000") %>%
+  select(not_overlapped_AutoReview,not_overlapped_TP_FN,AutoReview_intersection,County)
+rownames(AutoReview_areas_10000)<-AutoReview_areas_10000$County
+AutoReview_areas_10000$County<-NULL
 
-#      Merge all data.frames into a single Ellipse_areas data.frame
-Ellipse_areas_counties <- merge(TP_FN_ellipse_counties,AutoReview_ellipse_counties,by = c("County","Ellipse_Size"),all=TRUE)
-Ellipse_areas_counties <- merge(Ellipse_areas_counties,FLAPS_ellipse_counties,by = c("County","Ellipse_Size"),all=TRUE)
-Ellipse_areas_counties <- merge(Ellipse_areas_counties,AutoReview_intersection_counties,by = c("County","Ellipse_Size"),all=TRUE)
-Ellipse_areas_counties <- merge(Ellipse_areas_counties,FLAPS_intersection_counties,by = c("County","Ellipse_Size"),all=TRUE)
+AutoReview_areas_20000<-Ellipse_intersection_areas_AutoReview %>%
+  filter(Ellipse_Size=="20000")
+AutoReview_areas_3000<-Ellipse_intersection_areas_AutoReview %>%
+  filter(Ellipse_Size=="3000")
 
-Ellipse_areas_cluster <- merge(TP_FN_ellipse_cluster,AutoReview_ellipse_cluster,by = c("County","Ellipse_Size"),all=TRUE)
-Ellipse_areas_cluster <- merge(Ellipse_areas_cluster,FLAPS_ellipse_cluster,by = c("County","Ellipse_Size"),all=TRUE)
-Ellipse_areas_cluster <- merge(Ellipse_areas_cluster,AutoReview_intersection_cluster,by = c("County","Ellipse_Size"),all=TRUE)
-Ellipse_areas_cluster <- merge(Ellipse_areas_cluster,FLAPS_intersection_cluster,by = c("County","Ellipse_Size"),all=TRUE)
+FLAPS_areas_10000<-Ellipse_intersection_areas_FLAPS %>%
+  filter(Ellipse_Size=="10000")
+FLAPS_areas_20000<-Ellipse_intersection_areas_FLAPS %>%
+  filter(Ellipse_Size=="20000")
+FLAPS_areas_3000<-Ellipse_intersection_areas_FLAPS %>%
+  filter(Ellipse_Size=="3000")
 
-#      Calculate the proportion metric for Ellipse Overlap method. This metric is the 
-#      product of the proportion of the hybrid intersection areas out of the total 
-#      hybrid ellipse areas and the proportion of the hybrid intersection areas out
-#      of the total hybrid ellipse areas.
-Ellipse_areas_differences_counties <- Ellipse_areas_counties %>%
-  group_by(Ellipse_Size) %>%
-  mutate(intersection_FLAPS_prop = (FLAPS_intersection_area/TP_FN_ellipse_area) * (FLAPS_intersection_area/FLAPS_ellipse_area)) %>%
-  mutate(intersection_AutoReview_prop = (AutoReview_intersection_area/TP_FN_ellipse_area) * (AutoReview_intersection_area/AutoReview_ellipse_area))
 
-Ellipse_areas_differences_cluster <- Ellipse_areas_cluster %>%
-  group_by(Ellipse_Size) %>%
-  mutate(intersection_FLAPS_prop = (FLAPS_intersection_area/TP_FN_ellipse_area) * (FLAPS_intersection_area/FLAPS_ellipse_area)) %>%
-  mutate(intersection_AutoReview_prop = (AutoReview_intersection_area/TP_FN_ellipse_area) * (AutoReview_intersection_area/AutoReview_ellipse_area))
 
-#      Gather and organize data to produce line graphs for visualizing results of
-#      "Ellipse Overlap" method
-Ellipse_plots_data_counties <- gather(Ellipse_areas_differences_counties[,c(1,2,8,9)],model, proportion_overlap, intersection_FLAPS_prop:intersection_AutoReview_prop, factor_key=TRUE)
-
-Ellipse_plots_data_cluster <- gather(Ellipse_areas_differences_cluster[,c(1,2,8,9)],model, proportion_overlap, intersection_FLAPS_prop:intersection_AutoReview_prop, factor_key=TRUE)
-
-Ellipse_plots_data_counties_10000 <- Ellipse_plots_data_counties %>%
-  filter(Ellipse_Size==10000) %>%
-  mutate(Ellipse_Size_="10000 meters")
-Ellipse_plots_data_counties_20000 <- Ellipse_plots_data_counties %>%
-  filter(Ellipse_Size==20000) %>%
-  mutate(Ellipse_Size_="20000 meters")
-Ellipse_plots_data_counties_3000 <- Ellipse_plots_data_counties %>%
-  filter(Ellipse_Size==3000) %>%
-  mutate(Ellipse_Size_=" 3000 meters")
-
-Ellipse_plots_data_cluster_10000 <- Ellipse_plots_data_cluster %>%
-  filter(Ellipse_Size=="10000.csv") %>%
-  mutate(Ellipse_Size_="10000 meters")
-Ellipse_plots_data_cluster_20000 <- Ellipse_plots_data_cluster %>%
-  filter(Ellipse_Size=="20000.csv") %>%
-  mutate(Ellipse_Size_="20000 meters")
-Ellipse_plots_data_cluster_3000 <- Ellipse_plots_data_cluster %>%
-  filter(Ellipse_Size=="3000.csv") %>%
-  mutate(Ellipse_Size_=" 3000 meters")
-
-Ellipse_plots_data_counties <- rbind(Ellipse_plots_data_counties_3000,Ellipse_plots_data_counties_10000)
-Ellipse_plots_data_counties <- rbind(Ellipse_plots_data_counties,Ellipse_plots_data_counties_20000)
-
-Ellipse_plots_data_cluster <- rbind(Ellipse_plots_data_cluster_3000,Ellipse_plots_data_cluster_10000)
-Ellipse_plots_data_cluster <- rbind(Ellipse_plots_data_cluster,Ellipse_plots_data_cluster_20000)
-
-Ellipse_plots_data_counties_FLAPS <- Ellipse_plots_data_counties %>%
-  filter(model=="intersection_FLAPS_prop") %>%
-  mutate(model_="FLAPS") %>%
-  mutate(geography="FLAPS counties")
-Ellipse_plots_data_counties_AutoReview <- Ellipse_plots_data_counties %>%
-  filter(model=="intersection_AutoReview_prop") %>%
-  mutate(model_="Hybrid") %>%
-  mutate(geography="Hybrid counties")
-
-Ellipse_plots_data_cluster_FLAPS <- Ellipse_plots_data_cluster %>%
-  filter(model=="intersection_FLAPS_prop") %>%
-  mutate(model_="FLAPS") %>%
-  mutate(geography="FLAPS cluster")
-Ellipse_plots_data_cluster_AutoReview <- Ellipse_plots_data_cluster %>%
-  filter(model=="intersection_AutoReview_prop") %>%
-  mutate(model_="Hybrid") %>%
-  mutate(geography="Hybrid cluster")
-
-Ellipse_plots_data <- rbind(Ellipse_plots_data_counties_FLAPS,
-                                     Ellipse_plots_data_counties_AutoReview,
-                                     Ellipse_plots_data_cluster_FLAPS,
-                                     Ellipse_plots_data_cluster_AutoReview)
-
-#      Create box-and-whiskers to visualize results of "Ellipse Overlap" method
-Ellipse_plots_data[is.na(Ellipse_plots_data)] = 0
-Ellipse_plot <- ggplot(Ellipse_plots_data, aes( x = geography, y = proportion_overlap , fill = model_) ) +
-  geom_boxplot(outlier.colour = c("grey40") , outlier.size=3.5) + 
-  scale_fill_manual(values=c("cadetblue", "orange", "orangered3")) +
-  facet_wrap(~Ellipse_Size_) + theme_bw() +labs(title="Standard Deviational Ellipse Proportion Overlap with Ground Truth",
-                                        x="Grid Size for Ellipse Groups", y="Propotion of Ellipse Area Overlap") + 
-  guides(fill = guide_legend("Model_Type"))
-Ellipse_plot + theme(strip.text.x = element_text(size=16, face="bold")) + 
-  theme(axis.text.x = element_text(colour="black",
-                                     size = 11,
-                                     face = "bold.italic",
-                                     angle=45,
-                                     vjust=1,
-                                     hjust=1))
-
-Ellipse_areas_counties[is.na(Ellipse_areas_counties)] = 0
-Ellipse_areas_counties_agg <- aggregate(x=Ellipse_areas_counties[,
-  c("TP_FN_ellipse_area","AutoReview_intersection_area","FLAPS_intersection_area")],
-                                                      by=list(Ellipse_areas_counties[,"Ellipse_Size"]),
-                                                      FUN=sum)
-
-Ellipse_areas_counties_proportions_10000 <- gather(Ellipse_areas_counties[1,c(3,6,7)],model,overlapped,
-                                                   AutoReview_intersection_area:FLAPS_intersection_area,
-                                                   factor_key=TRUE)
-Ellipse_areas_counties_proportions_10000<-Ellipse_areas_counties_proportions_10000[,c(1,3)] %>%
-  mutate(not_overlapped=TP_FN_ellipse_area-overlapped) %>%
-  select(overlapped,not_overlapped)
-rownames(Ellipse_areas_counties_proportions_10000) <- c("AutoReview","FLAPS")
-Ellipse_areas_counties_proportions_10000<-as.matrix(Ellipse_areas_counties_proportions_10000)
-prop.test(Ellipse_areas_counties_proportions_10000)
-
-Ellipse_areas_counties_proportions_20000 <- gather(Ellipse_areas_counties[2,c(3,6,7)],model,overlapped,
-                                          AutoReview_intersection_area:FLAPS_intersection_area,
-                                          factor_key=TRUE)
-Ellipse_areas_counties_proportions_20000<-Ellipse_areas_counties_proportions_20000[,c(1,3)] %>%
-  mutate(not_overlapped=TP_FN_ellipse_area-overlapped) %>%
-  select(overlapped,not_overlapped)
-rownames(Ellipse_areas_counties_proportions_20000) <- c("AutoReview","FLAPS")
-Ellipse_areas_counties_proportions_20000<-as.matrix(Ellipse_areas_counties_proportions_20000)
-prop.test(Ellipse_areas_counties_proportions_20000)
-
-Ellipse_areas_counties_proportions_3000 <- gather(Ellipse_areas_counties[3,c(3,6,7)],model,overlapped,
-                                          AutoReview_intersection_area:FLAPS_intersection_area,
-                                          factor_key=TRUE)
-Ellipse_areas_counties_proportions_3000<-Ellipse_areas_counties_proportions_3000[,c(1,3)] %>%
-  mutate(not_overlapped=TP_FN_ellipse_area-overlapped) %>%
-  select(overlapped,not_overlapped)
-rownames(Ellipse_areas_counties_proportions_3000) <- c("AutoReview","FLAPS")
-Ellipse_areas_counties_proportions_3000<-as.matrix(Ellipse_areas_counties_proportions_3000)
-prop.test(Ellipse_areas_counties_proportions_3000)
-
-Ellipse_areas_cluster[is.na(Ellipse_areas_cluster)] = 0
-Ellipse_areas_cluster_agg <- aggregate(x=Ellipse_areas_cluster[,
-                                                                 c("TP_FN_ellipse_area","AutoReview_intersection_area","FLAPS_intersection_area")],
-                                        by=list(Ellipse_areas_cluster[,"Ellipse_Size"]),
-                                        FUN=sum)
-
-Ellipse_areas_cluster_proportions_10000 <- gather(Ellipse_areas_cluster[1,c(3,6,7)],model,overlapped,
-                                                   AutoReview_intersection_area:FLAPS_intersection_area,
-                                                   factor_key=TRUE)
-Ellipse_areas_cluster_proportions_10000<-Ellipse_areas_cluster_proportions_10000[,c(1,3)] %>%
-  mutate(not_overlapped=TP_FN_ellipse_area-overlapped) %>%
-  select(overlapped,not_overlapped)
-rownames(Ellipse_areas_cluster_proportions_10000) <- c("AutoReview","FLAPS")
-Ellipse_areas_cluster_proportions_10000<-as.matrix(Ellipse_areas_cluster_proportions_10000)
-prop.test(Ellipse_areas_cluster_proportions_10000)
-
-Ellipse_areas_cluster_proportions_20000 <- gather(Ellipse_areas_cluster[2,c(3,6,7)],model,overlapped,
-                                                   AutoReview_intersection_area:FLAPS_intersection_area,
-                                                   factor_key=TRUE)
-Ellipse_areas_cluster_proportions_20000<-Ellipse_areas_cluster_proportions_20000[,c(1,3)] %>%
-  mutate(not_overlapped=TP_FN_ellipse_area-overlapped) %>%
-  select(overlapped,not_overlapped)
-rownames(Ellipse_areas_cluster_proportions_20000) <- c("AutoReview","FLAPS")
-Ellipse_areas_cluster_proportions_20000<-as.matrix(Ellipse_areas_cluster_proportions_20000)
-prop.test(Ellipse_areas_cluster_proportions_20000)
-
-Ellipse_areas_cluster_proportions_3000 <- gather(Ellipse_areas_cluster[3,c(3,6,7)],model,overlapped,
-                                                  AutoReview_intersection_area:FLAPS_intersection_area,
-                                                  factor_key=TRUE)
-Ellipse_areas_cluster_proportions_3000<-Ellipse_areas_cluster_proportions_3000[,c(1,3)] %>%
-  mutate(not_overlapped=TP_FN_ellipse_area-overlapped) %>%
-  select(overlapped,not_overlapped)
-rownames(Ellipse_areas_cluster_proportions_3000) <- c("AutoReview","FLAPS")
-Ellipse_areas_cluster_proportions_3000<-as.matrix(Ellipse_areas_cluster_proportions_3000)
-prop.test(Ellipse_areas_cluster_proportions_3000)
-
-prop.test(rbind(Ellipse_areas_cluster_proportions_10000[1,],Ellipse_areas_counties_proportions_10000[1,]))
-
-prop.test(rbind(Ellipse_areas_cluster_proportions_3000[1,],Ellipse_areas_counties_proportions_3000[1,]))
-
-prop.test(rbind(Ellipse_areas_cluster_proportions_20000[1,],Ellipse_areas_counties_proportions_20000[1,]))
-
-prop.test(rbind(Ellipse_areas_cluster_proportions_10000[2,],Ellipse_areas_counties_proportions_10000[2,]))
-
-prop.test(rbind(Ellipse_areas_cluster_proportions_3000[2,],Ellipse_areas_counties_proportions_3000[2,]))
-
-prop.test(rbind(Ellipse_areas_cluster_proportions_20000[2,],Ellipse_areas_counties_proportions_20000[2,]))
 ########################################
 ############BUFFER CAPTURE##############
 ########################################
@@ -716,130 +529,3 @@ capture_plot_count_cluster <- gather(capture_plot_final_cluster[,c(1,2,5)], coun
 capture_plot_prop_counties <- gather(capture_plot_final_counties[,c(3,4,5)], prop_measure, prop_value, Prop_AutoReview:Prop_FLAPS, factor_key=TRUE)
 capture_plot_prop_cluster <- gather(capture_plot_final_cluster[,c(3,4,5)],prop_measure, prop_value, Prop_AutoReview:Prop_FLAPS, factor_key=TRUE)
 capture_plot_final <- merge(capture_plot_prop,capture_plot_count,by="BUFF_DIST")
-
-#      Create box-and-whiskers plots to display "Buffer Capture" method results.
-par(mar=c(6, 4.5, 4, 5.5) + 0.1)
-
-capture_prop_AutoReview <- rownames(capture_plot_final[capture_plot_final$prop_measure=="Prop_AutoReview",])
-capture_prop_FLAPS <- rownames(capture_plot_final[capture_plot_final$prop_measure=="Prop_FLAPS",])
-plot(capture_plot_final[c(capture_prop_AutoReview),"BUFF_DIST"],
-     capture_plot_final[c(capture_prop_AutoReview),"prop_value"],
-     pch=16, cex=0.8,axes=FALSE, ylim=c(0,100),
-     xlab="Buffer size (meters)", ylab="", type="b",col="#f08671",
-     main="Results of 'buffer capture' method for assessing locational accuracy")
-axis(2, ylim=c(0,100),col="#ca0020",col.axis="#ca0020",las=1)  ## las=1 makes horizontal labels
-axis(1, xlim=c(-90,5090),col="black",las=2)  ## las=1 makes horizontal labels
-lines(capture_plot_final[c(capture_prop_FLAPS),"BUFF_DIST"],
-      capture_plot_final[c(capture_prop_FLAPS),"prop_value"],
-      type="o", pch=22, cex=0.8, lty=2, col="#ca0020")
-mtext("% of buffers that capture a modelled farm",side=2,line=3,cex=0.8)
-
-par(new=TRUE)
-
-capture_count_AutoReview <- rownames(capture_plot_final[capture_plot_final$count_measure=="Count_AutoReview",])
-capture_count_FLAPS <- rownames(capture_plot_final[capture_plot_final$count_measure=="Count_FLAPS",])
-plot(capture_plot_final[c(capture_count_AutoReview),"BUFF_DIST"], 
-     capture_plot_final[c(capture_count_AutoReview),"count_value"], pch=15, cex=0.8,xlab="", ylab="", 
-     ylim=c(0,50000), axes=FALSE, type="b", col="#92c5de")
-lines(capture_plot_final[c(capture_count_FLAPS),"BUFF_DIST"],capture_plot_final[c(capture_count_FLAPS),"count_value"],
-      type="o", pch=22, cex=0.8,lty=2, col="#0571b0")
-
-mtext("Number of modelled farms captured by buffer",side=4,line=3.7,cex=0.8) 
-axis(4, ylim=c(0,50000), col="#0571b0",col.axis="#0571b0",las=1)
-
-legend(x=10,y=49700,title="Model captured",legend=c("Hybrid","FLAPS"),
-       text.col="black",col="black",lty=c(1,2),pch=c(15,22),bty="n")
-
-########################################
-########DISTANCES BETWEEN FARMS#########
-########################################
-#distances_home <- "C:/Users/GKuiper/Desktop/Distances"
-distances_home <- "O:/AI Modeling Coop Agreement 2017/Grace Cap Stone Validation/Validation_Results/Buffer_Capture"
-
-distances <- list.files(path=distances_home, full.names = T, recursive = F)
-
-TP_FN_distances <- data.frame()
-AutoReview_distances <- data.frame()
-FLAPS_distances <- data.frame()
-
-#      Import Distances results into separate data.frames based on data/model type: 
-#      ground truth, hybrid, or FLAPS
-for (i in 1:length(distances)) {
-  if (grepl("AutoReview_Distance",distances[i])){
-    AutoReview <- fread(distances[i],blank.lines.skip = T,stringsAsFactors = F,
-                        header = T, fill = T)
-    AutoReview$County <- strapply(distances[i],"Distances/(.*)_AutoReview_Distance",simplify=TRUE)
-    AutoReview_distances <- rbind(AutoReview_distances,AutoReview,fill=TRUE)
-  }
-  if (grepl("TP_FN_Distance",distances[i])){
-    TP_FN <- fread(distances[i],blank.lines.skip = T,stringsAsFactors = F,
-                   header = T, fill = T)
-    TP_FN$County <- strapply(distances[i],"Distances/(.*)_TP_FN_Distance",simplify=TRUE)
-    TP_FN_distances <- rbind(TP_FN_distances,TP_FN,fill=TRUE)
-  }
-  if (grepl("FLAPS_Distance",distances[i])){
-    FLAPS <- fread(distances[i],blank.lines.skip = T,stringsAsFactors = F,
-                   header = T, fill = T)
-    FLAPS$County <- strapply(distances[i],"Distances/(.*)_FLAPS_Distance",simplify=TRUE)
-    FLAPS_distances <- rbind(FLAPS_distances,FLAPS,fill=TRUE)
-  }
-}
-
-#      Eliminate unnecessary fields (select County and NEAR_DIST); rename NEAR_DIST variable
-#      as model type (e.g. FLAPS, TP_FN, or AutoReview); create count variable
-FLAPS_near_distances <- FLAPS_distances %>%
-  select(NEAR_DIST,County) %>%
-  mutate(FLAPS=NEAR_DIST) %>%
-  select(-1)
-
-TP_FN_near_distances <- TP_FN_distances %>%
-  select(NEAR_DIST,County) %>%
-  mutate(TP_FN=NEAR_DIST) %>%
-  select(-1)
-
-AutoReview_near_distances <- AutoReview_distances %>%
-  select(NEAR_DIST,County) %>%
-  mutate(AutoReview=NEAR_DIST) %>%
-  select(-1)
-
-AutoReview_near_distances$count <- c(1:nrow(AutoReview_near_distances))
-TP_FN_near_distances$count <- c(1:nrow(TP_FN_near_distances))
-FLAPS_near_distances$count <- c(1:nrow(FLAPS_near_distances))
-
-#      Merge three model distances data.frames into single data.frame and convert table from
-#      wide to long.
-Near_distances <- merge(AutoReview_near_distances[,c(2,3)],TP_FN_near_distances[,c(2,3)],by="count")
-Near_distances <- merge(Near_distances,FLAPS_near_distances[,c(2,3)],by="count")
-Near_distances$count <- NULL
-Near_distances <- gather(Near_distances,model,distances,AutoReview:FLAPS,factor_key=TRUE)
-
-Near_distances_AutoReview <- Near_distances %>%
-  filter(model=="AutoReview") %>%
-  mutate(Farms="Hybrid") %>%
-  select(-1)
-Near_distances_TP_FN <- Near_distances %>%
-  filter(model=="TP_FN") %>%
-  mutate(Farms="Ground truth") %>%
-  select(-1)
-Near_distances_FLAPS <- Near_distances %>%
-  filter(model=="FLAPS") %>%
-  mutate(Farms="FLAPS") %>%
-  select(-1)
-
-Near_distances <- rbind(Near_distances_AutoReview,Near_distances_TP_FN)
-Near_distances <- rbind(Near_distances,Near_distances_FLAPS)
-
-#      Create histogram of distance between farms by model type
-library(ggplot2)
-ggplot(Near_distances, aes(x=distances, color=Farms,fill=Farms)) +
-  geom_histogram(alpha=0.5, position="dodge",bins=12)+
-  theme(legend.position="right") +
-  theme_classic() +
-  labs(x = "Distances between farms (meters)", y = "Number of distances") +
-  ggtitle("Distribution of models' distances between farms")
-
-#      Conduct KS tests for statistical significance in differences in distribution of
-#      distances between farms.
-ks.test(FLAPS_near_distances$FLAPS, TP_FN_near_distances$TP_FN,alternative=c("two.sided"))
-ks.test(AutoReview_near_distances$AutoReview, TP_FN_near_distances$TP_FN,alternative=c("two.sided"))
-
