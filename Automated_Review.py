@@ -106,7 +106,8 @@ neg_masks = [
     # [r'R:\Nat_Hybrid_Poultry\Remote_Sensing\PADUS\PADUS1_4Shapefile\PADUS_WA_OR_CA_FED_STAT_LOC.shp, 0]
     ]
 pos_masks = [
-        
+            # Note that the functionality of 'positive masks', masks that delete
+            # all points outside of the specified area, is untested.
             ]
 
 # Define the maximum and minimum Length(L) or Aspect Ratio(AR) values.
@@ -163,6 +164,7 @@ skip_list = [
 
 # Overwrite certain parameters set above, if this tool is run as a custom
 # ArcGIS Python tool. The input values will be determined by the user.
+# This functionality is completely untested and likely requires modification.
 if run_script_as_tool == True:
     cluster_list = arcpy.GetParameterAsText(0)   # This should be in list format, but can contain a single entry
     prob_surface_threshold = arpy.GetParametersAsText(1) # Set default to 0.1
@@ -279,7 +281,7 @@ def check_parameters():
     to change them in this function too!
 
     To disable this function, simply remove or comment out the following line
-    in the if __name__=='__main__': section of the ccode:
+    in the if __name__=='__main__' section of the code:
            check_parameters()
 
     :return: None
