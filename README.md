@@ -45,9 +45,6 @@ Original 35 counties refers to the regional model, which the hybrid model was ba
 |MS  |Jones |28067| Original 35 counties |
 |MS    |Smith |28129| Original 35 counties |
 |MS    |Wayne |28153| Original 35 counties |
-|MS  |Hancock|28045| Original 35 counties |
-|MS    |Harrison|28047| Original 35 counties |
-|MS    |Pearl River|28109| Original 35 counties |
 |LA  |Claiborne|22027| Original 35 counties |
 |LA    |Lincoln|22061| Original 35 counties |
 |LA    |Union |22111| Original 35 counties |
