@@ -5,6 +5,10 @@ library(sf)
 #tp_fn_locations <- "O:/AI Modeling Coop Agreement 2017/Grace Cap Stone Validation/Validation_Results/TP_FN_Counties/"
 tp_fn_fp_locations <- "C:/Users/apddsouth/Documents/TP_FN_FP/"
 
+# define color pallete
+#hist_pal <- c("#28D6DC", alpha("#F08080", .4))
+hist_pal <- c(alpha("#28D6DC", .5), alpha("red", .3))
+
 gather_the_goldfish <- function(){
     all_counties = 0
     count = 0
@@ -41,21 +45,29 @@ gather_the_goldfish <- function(){
 
 a <- gather_the_goldfish()
 
-plot_the_goldfish <- function(goldfish_data=gather_the_goldfish(), bin_width=0.05, y_cutoff=5000){
+plot_the_goldfish <- function(goldfish_data=gather_the_goldfish(), bin_width=0.05, y_cutoff=5000, mode="density", position="dodge"){
+    # Note that mode can be ..density.. or ..count..
+    # position can be "identity" to overlay, "dodge" to be next to each other, and "stack" to stack on top
+    hist_mode <- function(m){}
     
     # recategorize
     goldfish_data$category[goldfish_data$TP_FN_FP==1 | goldfish_data$TP_FN_FP==2] <- "Correct farm locations"
     goldfish_data$category[goldfish_data$TP_FN_FP==3] <- "False positives"
     
     # plot the plot
-    # sometimes ..density.. is better than ..count..
-    ggplot(goldfish_data, aes(x=ProbSurf_1, y=..density.., fill=category)) +
-        geom_histogram(binwidth=bin_width, position="identity") +
+    ggplot(goldfish_data, aes(x=ProbSurf_1, y={if (mode=="density"){..density..} else if (mode=="count"){..count..}}, fill=category)) +
+        geom_histogram(binwidth=bin_width, position=position, color="black") +
         
-        scale_fill_manual(values=c("#28D6DC", alpha("#F08080", .4))) +
+        scale_fill_manual(values=hist_pal) +
                 stat_bin(binwidth=bin_width, geom="text", data=subset(goldfish_data, category=="Correct farm locations"),
                  colour="black", size=3.5,
-                 aes(label=..count.., group=category, y=0.8*(..density..))) +
+                 aes(label=(..count..), 
+                     group=category, 
+                     y=0.8*({if (mode=="density"){..density..} else if (mode=="count"){..count..}})
+                     )) +
+        xlab(paste("Probability Surface value (bins of", bin_width, "each)")) +
+        ylab({if (mode=="density"){"Density"} else if (mode=="count"){"Count"}}) +
+        
         # format the legend. For more info, see here: http://www.sthda.com/english/wiki/ggplot2-legend-easy-steps-to-change-the-position-and-the-appearance-of-a-graph-legend-in-r-software
         theme(legend.position = c(.8, .8))
         
