@@ -11,12 +11,16 @@
 # 6. simulated_sampling
 # 7. project (auto_review final file output)
 
-import pandas as pd  # reference this for data frame https://www.geeksforgeeks.org/python-pandas-dataframe/
+from Automated_Review import check_time
+import pandas as pd
 import numpy as np
 import arcpy
+import csv
 import os
 
-results = r'R:\Nat_Hybrid_Poultry\Remote_Sensing\Feature_Analyst'
+results = r'R:\Nat_Hybrid_Poultry\Results\Automated_Review_Results'
+
+csv_file = r'C:\Users\apddsouth\Desktop\csv.csv'
 
 def find_files(folder):
     print ("Finding files...")
@@ -25,46 +29,77 @@ def find_files(folder):
     for dirpath, dirnames, filenames in walk:
         for filename in filenames:
             relevant_files.append(os.path.join(dirpath, filename))
-    print ("Files found.")
+    print ("Files found. Time so far:", check_time())
     return(relevant_files)
 
-def count_points(files):
-    batch_total = 0
-    clip_total = 0
-    masking_total = 0
-    LAR_total = 0
-    prob_surface_total = 0
-    collapse_points_total = 0
-    sim_sampling_total = 0
-    auto_review_total = 0
+
+def write_list_to_CSV(lst, file_path):
+    with open(file_path, 'wb') as myfile:
+        wr = csv.writer(myfile, quoting=csv.QUOTE_ALL)
+        for row in lst:
+            wr.writerow(row)
+    print ("List saved to CSV here:", file_path)
+
+
+def read_CSV_to_list(CSV_file_path):
+    lst = []
+    with open(csv_file) as csvfile:
+        readCSV = csv.reader(csvfile, delimiter=',')
+        for row in readCSV:
+            lst.append(row[0])
+    return(lst)
+
+def count_points(files, csv_folder_path=None):
+    print("Doing some math.")
+    steps = ['Batch', 'Clip', 'Masking', 'LAR',
+             'ProbSurf', 'CollectEvents', 'SimSampling',
+             'AutoReview']
+    totals = np.zeros(8)
+
+    timer = 0.0
+    current = 0.0
+    # timer_delay is how frequently it should save a CSV and check time
+    timer_delay = 10
+
+    def save_csv(final=False):
+        previous_csv_path = os.path.join(csv_folder_path, "count_" + str(int(current-timer_delay)) + ".csv")
+        csv_path = os.path.join(csv_folder_path, "count_" + str(int(current)) + ".csv")
+        write_list_to_CSV(np.array((steps, totals)), csv_path)
+        
+        # Don't do this for the first set, because no previous csv exists.
+        if not current == timer_delay and final==False:
+            os.remove(previous_csv_path)
+
     for item in files:
         count = arcpy.GetCount_management(item)
         count = int(count[0]) # Turn it into int, instead of the weird ArcGIS output.
-        if 'Batch_' in item:
-           batch_total += count
-        elif 'Clip_' in item:
-            clip_total += count
-        elif 'Masking_' in item:
-           masking_total += count
-        elif 'LAR_' in item:
-           LAR_total += count
-        elif 'ProbSurf_' in item:
-           prob_surtface_total += count
-        elif 'CollectEvents_' in item:
-           collapse_points_total += count
-        elif 'SimSampling_' in item:
-           sim_sampling_total += count
-        elif 'AutoReview_' in item:
-           auto_review_total += count
-           
+
+        for index in range(0, len(steps)):
+            # For the step that matches the file name, tally that up
+            if (steps[index] + "_") in os.path.basename(item):
+                totals[index] += count
+                break
+
         del count
 
-        summary = pd.DataFrame({'Automated Review step':['Batch', 'Clip', 'Masking', 'LAR',
-                                                         'ProbSurf', 'CollectEvents', 'SimSampling',
-                                                         'AutoReivew'],
-                                'Row count total': [batch_total, clip_total, masking_total, LAR_total,
-                                                    prob_surface_total, collapse_points_total,
-                                                    sim_sampling_total, auto_review_total]})
-        return(summary)
+        timer += 1
+        current += 1
+        
+        if timer == timer_delay:
+            if csv_folder_path is not None:
+                save_csv()
 
+            print int(current), "files computationally calculated, (" + str(int(round(current/len(files))*100)) + '% complete). Time so far:', check_time()
+            
+            timer = 0.0
+
+    # Once the loop is completed, all files have been calculated:
+    save_csv(final=True)
+    print("Math completed. Whew that was a lot of addition. I need a bigger abacus.")
+    
+    return(np.array((steps, totals)))
+
+x = read_CSV_to_list(csv_file)
+y = count_points(x, r'C:\Users\apddsouth\Desktop')
+print (y)
 
