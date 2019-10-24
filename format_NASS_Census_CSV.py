@@ -2,12 +2,14 @@
 # data in the form of CSV files and adds a FIPS code field.
 # Download census data here: https://quickstats.nass.usda.gov/
 
+# This is meant to be used with Python 3 (ArcGIS Pro)
+
 import os
-import pandas
+import pandas as pd
 
 files = [r'C:/example.csv',]  # Replace this with the relevant file paths.
 
-def add_FIPS(csv_files):
+def convert_FIPS(csv_files):
     """
 
     :param csv_files: List of one or more file paths to CSVs.
@@ -21,7 +23,7 @@ def add_FIPS(csv_files):
     for thing in csv_files:
         new_df = fn(thing)
         new_file_path = thing[:-4]+'_FIPS.csv'
-        new_df.to_csv(new_file_path, index_label=False)
+        new_df.to_csv(new_file_path, index=False)
 
 
 def match_format(csv_files, field):
@@ -35,11 +37,11 @@ def match_format(csv_files, field):
     for thing in csv_files:
         df = pd.read_csv(thing, dtype=str)
         df[field] = df[field].str.title()
-        df.to_csv(thing, index_label=False)
+        df.to_csv(thing, index=False)
         print ("Capitalized the '", field + "' field for", thing)
 
 
-def remove_codes(csv_files, field, codes=["(D)", "(L)", "(H)"]):
+def replace_codes(csv_files, field, codes=["(D)", "(L)", "(H)"], replace_value=0):
     """
     NASS Census data come with all sorts of codes like (L) that make data processing
     difficult. This removes (D), (L), and (H) from a specific field.
@@ -54,13 +56,17 @@ def remove_codes(csv_files, field, codes=["(D)", "(L)", "(H)"]):
 
     for thing in csv_files:
         df = pd.read_csv(thing, dtype=str)
-        # Replace (D), (L), and (H) with an empty string.
+        # Replace (D), (L), and (H) with 0, and move the code to a new field
         for code in codes:
-            df[field] = df[field].replace(code, "")
+            df[field] = df[field].replace(
+                code, replace_value).replace(
+                    " " + code, replace_value)
 
-        df.to_csv(thing, index_label=False)
-        print ("Removed weird characters for", thing)
+        # Overwrite CSV
+        df.to_csv(thing, index=False)
+        print ("Replaced weird characters with", replace_value, "for", thing)
 
 
 if __name__ == '__main__':
-    add_FIPS(files)
+    csvs = (r'O:\MapRequests\Meg_Parker\Bison_StoryMap\NASS_2012_Census_Bison_operations_with_inventory_by_county.csv', r'O:\MapRequests\Meg_Parker\Bison_StoryMap\NASS_2012_Census_Bison_inventory_by_county.csv')
+    replace_codes(csvs, "Value")
