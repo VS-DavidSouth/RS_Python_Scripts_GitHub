@@ -1,3 +1,4 @@
 
 # ignore all compiled Python files, they aren't relevant or necessary
 *.pyc
+.RHistory
